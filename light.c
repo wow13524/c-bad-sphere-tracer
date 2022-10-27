@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <float.h>
@@ -18,11 +19,10 @@ float brightness_ambient_light(Light *self, Vector3 *position) {
 }
 
 float brightness_point_light(Light *self, Vector3 *position) {
-    Vector3 *offset = vec3_sub(self->instance->position, position);
-    float distance = vec3_mag(offset);
-    free(offset);
-    offset = NULL;
-    return self->instance->size->x / distance / distance;
+    Vector3 *temp = vector3(0, 0, 0);
+    float distance_squared = vec3_mag2(vec3_sub(self->instance->position, position, temp));
+    free(temp);
+    return self->instance->size->x / distance_squared;
 }
 
 brightness_function_t ambient_light = brightness_ambient_light;

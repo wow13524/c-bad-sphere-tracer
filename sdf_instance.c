@@ -15,10 +15,9 @@ float distance_plane(SDFInstance *self, Vector3 *position) {
 }
 
 float distance_sphere(SDFInstance *self, Vector3 *position) {
-    Vector3 *offset = vec3_sub(self->instance->position, position);
-    float distance = vec3_mag(offset);
-    free(offset);
-    offset = NULL;
+    Vector3 *temp = vector3(0, 0, 0);
+    float distance = vec3_mag(vec3_sub(self->instance->position, position, temp));
+    free(temp);
     return distance - self->instance->size->x / 2;
 }
 

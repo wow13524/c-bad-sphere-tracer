@@ -4,11 +4,11 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#define EPSILON .0001
+#define EPSILON .000001
 
 typedef struct Camera {
     Instance *instance;
-    Ray* (*get_ray)(struct Camera *self, float u, float v);
+    Ray* (*get_ray)(struct Camera *self, float u, float v, Ray *out);
     float size_x;
     float size_y;
 } Camera;
