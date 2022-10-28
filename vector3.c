@@ -3,7 +3,10 @@
 #include <math.h>
 #include "vector3.h"
 
+int vectors = 0;
+
 Vector3* vector3(float x, float y, float z) {
+    vectors++;
     Vector3* a = malloc(sizeof(Vector3));
     assert(a);
     a->x = x;
@@ -22,6 +25,13 @@ float vec3_mag(Vector3 *a) {
 
 float vec3_dot(Vector3 *a, Vector3 *b) {
     return a->x * b->x + a->y * b->y + a->z * b->z;
+}
+
+Vector3* vec3_cpy(Vector3 *a, Vector3 *out) {
+    out->x = a->x;
+    out->y = a->y;
+    out->z = a->z;
+    return out;
 }
 
 Vector3* vec3_unit(Vector3 *a, Vector3 *out) {

@@ -4,7 +4,7 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#define EPSILON .000001
+#define EPSILON .0001
 
 typedef struct Camera {
     Instance *instance;

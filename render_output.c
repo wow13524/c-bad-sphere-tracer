@@ -27,3 +27,13 @@ void render_to_terminal(unsigned int *output) {
     free(output_buffer);
     output_buffer = NULL;
 }
+
+void render_to_ppm(unsigned int *output) {
+    FILE *outfile = fopen("output.ppm", "wb");
+    fprintf(outfile, "P6\n%d %d\n255\n", SCENE_OUTPUT_WIDTH, SCENE_OUTPUT_HEIGHT);
+    for (int i = 0; i < SCENE_OUTPUT_WIDTH * SCENE_OUTPUT_HEIGHT; i++) {
+        int c_int = *(output + i);
+        fprintf(outfile, "%c%c%c", c_int >> 16, (c_int >> 8) & 0xFF, c_int & 0xFF);
+    }
+    fclose(outfile);
+}

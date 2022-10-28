@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 #include "sdf_instance.h"
 
 SDFInstance* sdf_instance(distance_function_t distance_function) {
     SDFInstance *x = malloc(sizeof(SDFInstance));
     assert(x);
     x->instance = instance();
+    x->reflective = 0;
     x->get_distance = distance_function;
     return x;
 }
@@ -15,10 +17,8 @@ float distance_plane(SDFInstance *self, Vector3 *position) {
 }
 
 float distance_sphere(SDFInstance *self, Vector3 *position) {
-    Vector3 *temp = vector3(0, 0, 0);
-    float distance = vec3_mag(vec3_sub(self->instance->position, position, temp));
-    free(temp);
-    return distance - self->instance->size->x / 2;
+    static Vector3 temp = (Vector3){};
+    return vec3_mag(vec3_sub(self->instance->position, position, &temp)) - self->instance->size->x / 2;
 }
 
 distance_function_t plane = distance_plane;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <float.h>
+#include <math.h>
 #include "scene.h"
 
 int pixels = 0;
@@ -17,31 +18,32 @@ void add_light(Scene *self, Light *light) {
     *(self->lights + self->light_count++) = light;
 }
 
-SDFInstance* map(Scene *self, Vector3 *position) {
-    float closest_distance = FLT_MAX;
-    SDFInstance *closest_instance = *self->instances;
-    for (int j = 0; j < self->instance_count; j++) {
-        SDFInstance *instance = *(self->instances + j);
+float map(Scene *self, Vector3 *position, SDFInstance **out) {
+    *out = *self->instances;
+    float closest_distance = (*out)->get_distance(*out, position);
+    SDFInstance *instance = NULL;
+    for (int j = 1; j < self->instance_count; j++) {
+        instance = *(self->instances + j);
         float distance = instance->get_distance(instance, position);
         if (distance < closest_distance) {
             closest_distance = distance;
-            closest_instance = instance;
+            *out = instance;
         }
     }
-    return closest_instance;
+    return closest_distance;
 }
 
-SDFInstance* ray_march(Scene *self, Ray *r, float t_min, float t_max, Vector3 *out) {
+SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     marches++;
-    Vector3 *temp = vec3_mul(r->direction, t_min, vector3(0, 0, 0));
-    Vector3 *position = vec3_add(r->origin, temp, out);
+    static Vector3 temp_v = (Vector3){};
+    Vector3 *position = vec3_cpy(r->origin, out);
     SDFInstance *result = NULL;
+    float total_distance = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
-        result = map(self, position);
-        float closest_distance = result->get_distance(result, position);
-        vec3_mul(r->direction, closest_distance, temp);
-        vec3_add(position, temp, position);
-         if (closest_distance > t_max) {
+        float closest_distance = map(self, position, &result);
+        total_distance += closest_distance;
+        vec3_add(position, vec3_mul(r->direction, closest_distance, &temp_v), position);
+         if (total_distance > t_max) {
             result = NULL;
             break;
         }
@@ -49,56 +51,88 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_min, float t_max, Vector3 *o
             break;
         }
     }
-    free(temp);
     return result;
 }
 
 Color3* get_light(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
-    Color3 *temp_c = color3(0, 0, 0);
-    Vector3 *temp_v1 = vec3_mul(normal, 2 * EPSILON, vector3(0, 0, 0));
-    Vector3 *temp_v2 = vector3(0, 0, 0);
-    position = vec3_add(position, temp_v1, vector3(0, 0, 0));
-    Ray *visibility_ray = ray(position, temp_v1);
+    static Color3 temp_c = (Color3){};
+    static Vector3 temp_v1 = (Vector3){};
+    static Vector3 temp_v2 = (Vector3){};
+    static Vector3 temp_v3 = (Vector3){};
+    static Ray temp_r = (Ray){&temp_v3, &temp_v1};
+    vec3_mul(normal, 2 * EPSILON, &temp_v1);
+    position = vec3_add(position, &temp_v1, &temp_v3);
     col3_smul(out, 0, out);
     for (int i = 0; i < self->light_count; i++) {
         Light *l = *(self->lights + i);
-        Vector3 *offset = vec3_sub(l->instance->position, position, temp_v1);
-        if (l->visibility == ALWAYS_VISIBLE || !ray_march(self, visibility_ray, 0, vec3_mag(offset), temp_v2)) {
+        Vector3 *offset = vec3_sub(l->instance->position, position, &temp_v1);
+        float offset_mag = 0;
+        if (l->visibility == ALWAYS_VISIBLE || ((offset_mag = vec3_mag(offset)) && vec3_unit(offset, offset) && !ray_march(self, &temp_r, offset_mag, &temp_v2))) {
             float local_brightness = l->get_brightness(l, position);
             if (l->visibility == LINE_OF_SIGHT) {
-                local_brightness *= vec3_dot(normal, vec3_unit(offset, temp_v1));
+                local_brightness *= vec3_dot(normal, vec3_unit(offset, &temp_v1));
             }
-            col3_add(out, col3_smul(l->instance->color, local_brightness, temp_c), out);
+            col3_add(out, col3_smul(l->instance->color, local_brightness, &temp_c), out);
         }
     }
-    free(temp_c);
-    free(temp_v1);
-    free(temp_v2);
-    free(position);
-    free(visibility_ray);
     return out;
 }
 
 float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
-    Vector3 *offset = vec3_add(position, axis, vector3(0, 0, 0));
-    float distance = instance->get_distance(instance, offset);
-    vec3_sub(position, axis, offset);
-    distance -= instance->get_distance(instance, offset);
-    free(offset);
+    static Vector3 offset = (Vector3){};
+    vec3_add(position, axis, &offset);
+    float distance = instance->get_distance(instance, &offset);
+    vec3_sub(position, axis, &offset);
+    distance -= instance->get_distance(instance, &offset);
     return distance;
 }
 
 Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
-    Vector3 *dd = vector3(EPSILON, 0, 0);
-    out->x = get_distance_axis(instance, position, dd);
-    dd->x = 0;
-    dd->y = EPSILON;
-    out->y = get_distance_axis(instance, position, dd);
-    dd->y = 0;
-    dd->z = EPSILON;
-    out->z = get_distance_axis(instance, position, dd);
-    vec3_unit(out, out);
-    free(dd);
+    static Vector3 dx = (Vector3){EPSILON, 0, 0};
+    static Vector3 dy = (Vector3){0, EPSILON, 0};
+    static Vector3 dz = (Vector3){0, 0, EPSILON};
+    out->x = get_distance_axis(instance, position, &dx);
+    out->y = get_distance_axis(instance, position, &dy);
+    out->z = get_distance_axis(instance, position, &dz);
+    return vec3_unit(out, out);
+}
+
+Color3* get_color(Scene *self, Ray *r, int remaining_bounces, Color3 *out) {
+    static Color3 temp_c = (Color3){};
+    static Vector3 temp_v1 = (Vector3){};
+    static Vector3 temp_v2 = (Vector3){};
+    static Vector3 temp_v3 = (Vector3){};
+    SDFInstance *hit_instance = hit_instance = ray_march(
+        self,
+        r,
+        SCENE_MARCH_DIST_MAX,
+        &temp_v1
+    );
+    if (hit_instance) {
+        Vector3 *normal = get_normal(hit_instance, &temp_v1, &temp_v2);
+        Color3 *light_color = get_light(self, &temp_v1, normal, &temp_c);
+        Color3 *instance_color = hit_instance->instance->color;
+        instance_color = col3_mul(instance_color, light_color, &temp_c);
+        col3_add(out, instance_color, out);
+        if (remaining_bounces && hit_instance->reflective) {
+            vec3_add(&temp_v1, vec3_mul(normal, 2 * EPSILON, &temp_v3), r->origin);
+            vec3_sub(r->direction, vec3_mul(normal, 2 * vec3_dot(r->direction, normal), &temp_v2), r->direction);
+            get_color(self, r, remaining_bounces - 1, col3_smul(&temp_c, 0, &temp_c));
+            col3_add(out, col3_smul(&temp_c, hit_instance->reflective, &temp_c), out);
+        }
+    }
+    return out;
+}
+
+Color3* tonemap(Color3 *c, Color3 *out) {
+    float l = 0.299 * c->r + 0.587 * c->g + 0.114 * c->b;
+    float c_r = c->r / (1 + c->r);
+    float c_g = c->g / (1 + c->g);
+    float c_b = c->b / (1 + c->b);
+    col3_sdiv(c, 1 + l, out);
+    out->r = out->r * (1 - c_r) + c_r * c_r;
+    out->g = out->g * (1 - c_g) + c_g * c_g;
+    out->b = out->b * (1 - c_b) + c_b * c_b;
     return out;
 }
 
@@ -109,9 +143,7 @@ unsigned int* render(Scene *self, Camera *camera) {
     Color3 *temp_cout = color3(0, 0, 0);
     Vector3 *temp_v1 = vector3(0, 0, 0);
     Vector3 *temp_v2 = vector3(0, 0, 0);
-    Vector3 *temp_v3 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
-    SDFInstance *hit_instance = NULL;
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;
@@ -124,33 +156,20 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    hit_instance = ray_march(
-                        self,
-                        temp_r,
-                        0,
-                        FLT_MAX,
-                        temp_v3
-                    );
-                    if (hit_instance) {
-                        Vector3 *normal = get_normal(hit_instance, temp_v3, temp_v1);
-                        Color3 *light_color = get_light(self, temp_v3, normal, temp_c);
-                        Color3 *instance_color = hit_instance->instance->color;
-                        instance_color = col3_mul(instance_color, light_color, temp_c);
-                        col3_add(temp_cout, instance_color, temp_cout);
-                    }
+                    col3_smul(temp_c, 0, temp_c);
+                    col3_add(temp_cout, get_color(self, temp_r, SCENE_REFLECTIONS_MAX, temp_c), temp_cout);
                 }
             }
             col3_sdiv(temp_cout, SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES, temp_cout);
-            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(col3_clamp(temp_cout, temp_cout));
+            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
         }
     }
-    printf("%d pixels resulted in %d marches\n", pixels, marches);
+    printf("%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
     free(temp_c);
     free(temp_cout);
     free(temp_r);
     free(temp_v1);
     free(temp_v2);
-    free(temp_v3);
     return output;
 }
 

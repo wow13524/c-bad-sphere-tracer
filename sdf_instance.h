@@ -5,6 +5,7 @@
 
 typedef struct SDFInstance {
     Instance *instance;
+    float reflective;
     float (*get_distance)(struct SDFInstance *self, Vector3 *position);
 } SDFInstance;
 

@@ -1,6 +1,8 @@
 #ifndef COLOR3_H
 #define COLOR3_H
 
+int colors;
+
 typedef struct Color3 {
     float r;
     float g;
