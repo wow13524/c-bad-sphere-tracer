@@ -97,11 +97,12 @@ Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-Color3* get_color(Scene *self, Ray *r, int remaining_bounces, Color3 *out) {
+Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color3 *out) {
     static Color3 temp_c = (Color3){};
     static Vector3 temp_v1 = (Vector3){};
     static Vector3 temp_v2 = (Vector3){};
     static Vector3 temp_v3 = (Vector3){};
+    float reflective;
     SDFInstance *hit_instance = hit_instance = ray_march(
         self,
         r,
@@ -113,12 +114,12 @@ Color3* get_color(Scene *self, Ray *r, int remaining_bounces, Color3 *out) {
         Color3 *light_color = get_light(self, &temp_v1, normal, &temp_c);
         Color3 *instance_color = hit_instance->instance->color;
         instance_color = col3_mul(instance_color, light_color, &temp_c);
-        col3_add(out, instance_color, out);
-        if (remaining_bounces && hit_instance->reflective) {
+        reflective = hit_instance->reflective;
+        col3_add(out, col3_smul(instance_color, alpha * (1 - reflective), instance_color), out);
+        if (remaining_bounces && reflective > EPSILON) {
             vec3_add(&temp_v1, vec3_mul(normal, 2 * EPSILON, &temp_v3), r->origin);
             vec3_sub(r->direction, vec3_mul(normal, 2 * vec3_dot(r->direction, normal), &temp_v2), r->direction);
-            get_color(self, r, remaining_bounces - 1, col3_smul(&temp_c, 0, &temp_c));
-            col3_add(out, col3_smul(&temp_c, hit_instance->reflective, &temp_c), out);
+            get_color(self, r, remaining_bounces - 1, alpha * reflective, out);
         }
     }
     return out;
@@ -144,6 +145,7 @@ unsigned int* render(Scene *self, Camera *camera) {
     Vector3 *temp_v1 = vector3(0, 0, 0);
     Vector3 *temp_v2 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
+    float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;
@@ -156,12 +158,10 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    col3_smul(temp_c, 0, temp_c);
-                    col3_add(temp_cout, get_color(self, temp_r, SCENE_REFLECTIONS_MAX, temp_c), temp_cout);
+                    col3_add(temp_cout, get_color(self, temp_r, SCENE_REFLECTIONS_MAX, alpha, col3_smul(temp_c, 0, temp_c)), temp_cout);
                 }
             }
-            col3_sdiv(temp_cout, SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES, temp_cout);
-            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
+            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(col3_clamp(tonemap(temp_cout, temp_cout), temp_cout));
         }
     }
     printf("%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);

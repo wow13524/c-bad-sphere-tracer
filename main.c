@@ -23,23 +23,25 @@ int main(void) {
     SDFInstance *ground_plane = sdf_instance(plane);
     ground_plane->instance->position = vector3(0, -2.5, 0);
     ground_plane->instance->color = color3(1, .8, .8);
-    ground_plane->reflective = .125;
+    ground_plane->reflective = .25;
 
     SDFInstance *sphere_a = sdf_instance(sphere);
     sphere_a->instance->position = vector3(0, 0, 5);
     sphere_a->instance->size = vector3(5, 0, 0);
     sphere_a->instance->color = color3(.8, .8, 1);
-    sphere_a->reflective = .25;
+    sphere_a->reflective = .5;
 
     SDFInstance *sphere_b = sdf_instance(sphere);
     sphere_b->instance->position = vector3(5, -.5, 8);
     sphere_b->instance->size = vector3(4, 0, 0);
     sphere_b->instance->color = color3(.8, 1, .8);
+    sphere_b->reflective = .5;
 
     SDFInstance *sphere_c = sdf_instance(sphere);
     sphere_c->instance->position = vector3(-2, 1, 2.5);
     sphere_c->instance->size = vector3(1, 0, 0);
     sphere_c->instance->color = color3(.8, 0, .8);
+    sphere_c->reflective = .5;
 
     Camera *cam = perspective_camera(70 * M_PI / 180, 16. / 9.);
 
@@ -52,7 +54,7 @@ int main(void) {
     s->add_light(s, point_light_a);
     s->add_light(s, point_light_b);
 
-    render_to_terminal(s->render(s, cam));
+    render_to_ppm(s->render(s, cam));
 
     return EXIT_SUCCESS;
 }
