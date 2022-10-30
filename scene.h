@@ -27,7 +27,3 @@ typedef struct Scene {
 Scene* scene();
 
 #endif
-
-//20 secs
-//14 secs
-//4.5 secs
