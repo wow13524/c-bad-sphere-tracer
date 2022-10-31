@@ -1,11 +1,12 @@
 #include "instance.h"
+#include "material.h"
 
 #ifndef SDF_INSTANCE_H
 #define SDF_INSTANCE_H
 
 typedef struct SDFInstance {
     Instance *instance;
-    float reflective;
+    Material *material;
     float (*get_distance)(struct SDFInstance *self, Vector3 *position);
 } SDFInstance;
 

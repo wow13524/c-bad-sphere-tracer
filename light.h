@@ -10,6 +10,7 @@ enum LightVisibility {
 
 typedef struct Light {
     Instance *instance;
+    Color3 *color;
     enum LightVisibility visibility;
     float (*get_brightness)(struct Light *self, Vector3 *position);
 } Light;

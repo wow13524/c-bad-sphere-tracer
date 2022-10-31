@@ -54,7 +54,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     return result;
 }
 
-Color3* get_light(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
+Color3* get_diffuse(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
     static Color3 temp_c = (Color3){};
     static Vector3 temp_v1 = (Vector3){};
     static Vector3 temp_v2 = (Vector3){};
@@ -72,7 +72,7 @@ Color3* get_light(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) 
             if (l->visibility == LINE_OF_SIGHT) {
                 local_brightness *= vec3_dot(normal, vec3_unit(offset, &temp_v1));
             }
-            col3_add(out, col3_smul(l->instance->color, local_brightness, &temp_c), out);
+            col3_add(out, col3_smul(l->color, local_brightness, &temp_c), out);
         }
     }
     return out;
@@ -102,7 +102,7 @@ Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color
     static Vector3 temp_v1 = (Vector3){};
     static Vector3 temp_v2 = (Vector3){};
     static Vector3 temp_v3 = (Vector3){};
-    float reflective;
+    float diffuse_multiplier, reflectance_multiplier;
     SDFInstance *hit_instance = hit_instance = ray_march(
         self,
         r,
@@ -110,16 +110,17 @@ Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color
         &temp_v1
     );
     if (hit_instance) {
+        reflectance_multiplier = hit_instance->material->reflectance;
+        diffuse_multiplier = 1 - reflectance_multiplier;
         Vector3 *normal = get_normal(hit_instance, &temp_v1, &temp_v2);
-        Color3 *light_color = get_light(self, &temp_v1, normal, &temp_c);
-        Color3 *instance_color = hit_instance->instance->color;
+        Color3 *light_color = get_diffuse(self, &temp_v1, normal, &temp_c);
+        Color3 *instance_color = hit_instance->material->color;
         instance_color = col3_mul(instance_color, light_color, &temp_c);
-        reflective = hit_instance->reflective;
-        col3_add(out, col3_smul(instance_color, alpha * (1 - reflective), instance_color), out);
-        if (remaining_bounces && reflective > EPSILON) {
+        col3_add(out, col3_smul(instance_color, alpha * diffuse_multiplier, instance_color), out);
+        if (remaining_bounces && reflectance_multiplier > EPSILON) {
             vec3_add(&temp_v1, vec3_mul(normal, 2 * EPSILON, &temp_v3), r->origin);
             vec3_sub(r->direction, vec3_mul(normal, 2 * vec3_dot(r->direction, normal), &temp_v2), r->direction);
-            get_color(self, r, remaining_bounces - 1, alpha * reflective, out);
+            get_color(self, r, remaining_bounces - 1, alpha * reflectance_multiplier, out);
         }
     }
     return out;

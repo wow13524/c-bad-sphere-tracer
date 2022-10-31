@@ -3,8 +3,8 @@ PROG    = draw
 all:    $(PROG)
 
 # Tell make about the file dependencies
-HEAD	= scene.h render_output.h camera.h vector3.h color3.h ray.h instance.h sdf_instance.h light.h
-OBJ     = main.o scene.o camera.o render_output.o vector3.o color3.o ray.o instance.o sdf_instance.o light.o
+HEAD	= scene.h render_output.h camera.h vector3.h color3.h ray.h instance.h sdf_instance.h material.h light.h
+OBJ     = main.o scene.o camera.o render_output.o vector3.o color3.o ray.o instance.o sdf_instance.o material.o light.o
 
 # special libraries This can be blank
 LIB     =

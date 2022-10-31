@@ -8,6 +8,7 @@ Light* light(brightness_function_t brightness_function, enum LightVisibility vis
     Light *x = malloc(sizeof(Light));
     assert(x);
     x->instance = instance();
+    x->color = color3(1, 1, 1);
     x->visibility = visibility;
     x->get_brightness = brightness_function;
     return x;

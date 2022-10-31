@@ -7,7 +7,6 @@
 typedef struct Instance {
     Vector3 *position;
     Vector3 *size;
-    Color3 *color;
 } Instance;
 
 Instance* instance();

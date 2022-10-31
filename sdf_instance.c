@@ -7,7 +7,7 @@ SDFInstance* sdf_instance(distance_function_t distance_function) {
     SDFInstance *x = malloc(sizeof(SDFInstance));
     assert(x);
     x->instance = instance();
-    x->reflective = 0;
+    x->material = material();
     x->get_distance = distance_function;
     return x;
 }
