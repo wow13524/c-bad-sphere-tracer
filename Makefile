@@ -26,3 +26,8 @@ $(PROG):	$(OBJ)
 
 clean:
 	rm -f $(OBJ) $(PROG)
+
+png:
+	make
+	./draw
+	./pnmtopng output.ppm > output.png

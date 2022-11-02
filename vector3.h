@@ -14,6 +14,7 @@ float vec3_mag2(Vector3 *a);
 float vec3_mag(Vector3 *a);
 float vec3_dot(Vector3 *a, Vector3 *b);
 Vector3* vec3_cpy(Vector3 *a, Vector3 *out);
+Vector3* vec3_neg(Vector3 *a, Vector3 *out);
 Vector3* vec3_unit(Vector3 *a, Vector3 *out);
 Vector3* vec3_add(Vector3 *a, Vector3 *b, Vector3 *out);
 Vector3* vec3_sub(Vector3 *a, Vector3 *b, Vector3 *out);

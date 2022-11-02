@@ -30,7 +30,7 @@ float map(Scene *self, Vector3 *position, SDFInstance **out) {
             *out = instance;
         }
     }
-    return closest_distance;
+    return fabs(closest_distance);
 }
 
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
@@ -54,28 +54,14 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     return result;
 }
 
-Color3* get_diffuse(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
-    static Color3 temp_c = (Color3){};
-    static Vector3 temp_v1 = (Vector3){};
-    static Vector3 temp_v2 = (Vector3){};
-    static Vector3 temp_v3 = (Vector3){};
-    static Ray temp_r = (Ray){&temp_v3, &temp_v1};
-    vec3_mul(normal, 2 * EPSILON, &temp_v1);
-    position = vec3_add(position, &temp_v1, &temp_v3);
-    col3_smul(out, 0, out);
-    for (int i = 0; i < self->light_count; i++) {
-        Light *l = *(self->lights + i);
-        Vector3 *offset = vec3_sub(l->instance->position, position, &temp_v1);
-        float offset_mag = 0;
-        if (l->visibility == ALWAYS_VISIBLE || ((offset_mag = vec3_mag(offset)) && vec3_unit(offset, offset) && !ray_march(self, &temp_r, offset_mag, &temp_v2))) {
-            float local_brightness = l->get_brightness(l, position);
-            if (l->visibility == LINE_OF_SIGHT) {
-                local_brightness *= vec3_dot(normal, vec3_unit(offset, &temp_v1));
-            }
-            col3_add(out, col3_smul(l->color, local_brightness, &temp_c), out);
-        }
-    }
-    return out;
+Vector3* perturb_vector3(Vector3 *position, Vector3* offset, Vector3* out) {
+    static Vector3 temp_v = (Vector3){};
+    return vec3_add(position, vec3_mul(offset, 2 * EPSILON, &temp_v), out);
+}
+
+Vector3* reflect_vector3(Vector3 *direction, Vector3 *normal, Vector3 *out) {
+    static Vector3 temp_v = (Vector3){};
+    return vec3_sub(direction, vec3_mul(normal, 2 * vec3_dot(direction, normal), &temp_v), out);
 }
 
 float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
@@ -97,32 +83,100 @@ Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color3 *out) {
+SDFInstance* ray_march_transmit(Scene *self, Ray *r, Vector3 *normal, float t_max, Vector3 *out) {
+    static Vector3 temp_v = (Vector3){};
+    static Vector3 temp_r_origin = (Vector3){};
+    static Vector3 temp_r_direction = (Vector3){};
+    static Ray temp_r = (Ray){&temp_r_origin, &temp_r_direction};
+    perturb_vector3(r->origin, vec3_neg(normal, &temp_v), &temp_r_origin);
+    vec3_cpy(r->direction, &temp_r_direction);
+    //TODO refract direction
+    return ray_march(
+        self,
+        &temp_r,
+        t_max,
+        out
+    );
+}
+//TODO take instance transmission into account
+Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
     static Color3 temp_c = (Color3){};
     static Vector3 temp_v1 = (Vector3){};
     static Vector3 temp_v2 = (Vector3){};
     static Vector3 temp_v3 = (Vector3){};
-    float diffuse_multiplier, reflectance_multiplier;
-    SDFInstance *hit_instance = hit_instance = ray_march(
+    static Ray temp_r = (Ray){&temp_v3, &temp_v1};
+    perturb_vector3(position, normal, &temp_v3);
+    col3_smul(out, 0, out);
+    for (int i = 0; i < self->light_count; i++) {
+        Light *l = *(self->lights + i);
+        Vector3 *offset = vec3_sub(l->instance->position, position, &temp_v1);
+        float offset_mag = 0;
+        if (l->visibility == ALWAYS_VISIBLE || ((offset_mag = vec3_mag(offset)) && vec3_unit(offset, offset) && !ray_march(self, &temp_r, offset_mag, &temp_v2))) {
+            float local_brightness = l->get_brightness(l, position);
+            if (l->visibility == LINE_OF_SIGHT) {
+                local_brightness *= vec3_dot(normal, vec3_unit(offset, &temp_v1));
+            }
+            col3_add(out, col3_smul(l->color, local_brightness, &temp_c), out);
+        }
+    }
+    return out;
+}
+
+Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color3 *out) {
+    static Color3 temp_c = (Color3){};
+    static Vector3 temp_v = (Vector3){};
+    Vector3 *position = vector3(0, 0, 0);
+    SDFInstance *hit_instance = ray_march(
         self,
         r,
         SCENE_MARCH_DIST_MAX,
-        &temp_v1
+        position
     );
     if (hit_instance) {
-        reflectance_multiplier = hit_instance->material->reflectance;
-        diffuse_multiplier = 1 - reflectance_multiplier;
-        Vector3 *normal = get_normal(hit_instance, &temp_v1, &temp_v2);
-        Color3 *light_color = get_diffuse(self, &temp_v1, normal, &temp_c);
+        float reflectance_multiplier = hit_instance->material->reflectance;
+        float transmission_multiplier = (1 - reflectance_multiplier) * hit_instance->material->transmission;
+        float diffuse_multiplier = (1 - reflectance_multiplier) * (1 - hit_instance->material->transmission);
+        int has_transmission = transmission_multiplier > EPSILON && remaining_bounces;
+        int has_diffuse = diffuse_multiplier > EPSILON;
+        int has_reflectance = reflectance_multiplier > EPSILON && remaining_bounces;
         Color3 *instance_color = hit_instance->material->color;
-        instance_color = col3_mul(instance_color, light_color, &temp_c);
-        col3_add(out, col3_smul(instance_color, alpha * diffuse_multiplier, instance_color), out);
-        if (remaining_bounces && reflectance_multiplier > EPSILON) {
-            vec3_add(&temp_v1, vec3_mul(normal, 2 * EPSILON, &temp_v3), r->origin);
-            vec3_sub(r->direction, vec3_mul(normal, 2 * vec3_dot(r->direction, normal), &temp_v2), r->direction);
-            get_color(self, r, remaining_bounces - 1, alpha * reflectance_multiplier, out);
+        Vector3 *normal = get_normal(hit_instance, position, vector3(0, 0, 0));
+        Ray *second_ray = has_transmission || has_reflectance ? ray(vector3(0, 0, 0), vector3(0, 0, 0)) : NULL;
+        //Transmission contribution
+        if (has_transmission) {
+            vec3_cpy(position, second_ray->origin);
+            vec3_cpy(r->direction, second_ray->direction);
+            SDFInstance *second_hit_instance = ray_march_transmit(
+                self,
+                second_ray,
+                normal,
+                SCENE_MARCH_DIST_MAX,
+                second_ray->origin
+            );
+            perturb_vector3(second_ray->origin, get_normal(second_hit_instance, second_ray->origin, &temp_v), second_ray->origin);
+            //ray_march_transmit(self, second_ray, normal, SCENE_MARCH_DIST_MAX, second_ray->origin);
+            get_color(self, second_ray, remaining_bounces - 1, alpha * transmission_multiplier, out);
+        }
+        //Diffuse contribution
+        if (has_diffuse) {
+            Color3 *light_color = get_light_color(self, position, normal, &temp_c);
+            Color3 *diffuse_color = col3_mul(instance_color, light_color, &temp_c);
+            col3_add(out, col3_smul(diffuse_color, alpha * diffuse_multiplier, &temp_c), out);
+        }
+        //Reflectance contribution
+        if (has_reflectance) {
+            perturb_vector3(position, normal, second_ray->origin);
+            reflect_vector3(r->direction, normal, second_ray->direction);
+            get_color(self, second_ray, remaining_bounces - 1, alpha * reflectance_multiplier, out);
+        }
+        free(normal);
+        if (second_ray) {
+            free(second_ray->origin);
+            free(second_ray->direction);
+            free(second_ray);
         }
     }
+    free(position);
     return out;
 }
 

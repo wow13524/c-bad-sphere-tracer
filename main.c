@@ -21,7 +21,7 @@ int main(void) {
     point_light_b->color = color3(.5, 1, 1);
 
     SDFInstance *ground_plane = sdf_instance(plane);
-    ground_plane->instance->position = vector3(0, -2.5, 0);
+    ground_plane->instance->position = vector3(0, -2.501, 0);
     ground_plane->material->color = color3(1, .8, .8);
     ground_plane->material->reflectance = .25;
 
@@ -29,7 +29,8 @@ int main(void) {
     sphere_a->instance->position = vector3(0, 0, 5);
     sphere_a->instance->size = vector3(5, 0, 0);
     sphere_a->material->color = color3(.8, .8, 1);
-    sphere_a->material->reflectance = .9;
+    sphere_a->material->reflectance = .5;
+    sphere_a->material->transmission = .5;
 
     SDFInstance *sphere_b = sdf_instance(sphere);
     sphere_b->instance->position = vector3(5, -.5, 8);

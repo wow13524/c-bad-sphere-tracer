@@ -34,6 +34,13 @@ Vector3* vec3_cpy(Vector3 *a, Vector3 *out) {
     return out;
 }
 
+Vector3 *vec3_neg(Vector3 *a, Vector3 *out){
+    out->x = -a->x;
+    out->y = -a->y;
+    out->z = -a->z;
+    return out;
+}
+
 Vector3* vec3_unit(Vector3 *a, Vector3 *out) {
     return vec3_div(a, vec3_mag(a), out);
 }
