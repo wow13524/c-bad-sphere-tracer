@@ -55,22 +55,24 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
 }
 
 Vector3* perturb_vector3(Vector3 *position, Vector3* offset, Vector3* out) {
-    static Vector3 temp_v = (Vector3){};
-    return vec3_add(position, vec3_mul(offset, 2 * EPSILON, &temp_v), out);
+    return vec3_add(position, vec3_mul(offset, 2 * EPSILON, out), out);
 }
 
 Vector3* reflect_vector3(Vector3 *direction, Vector3 *normal, Vector3 *out) {
+    return vec3_sub(direction, vec3_mul(normal, 2 * vec3_dot(direction, normal), out), out);
+}
+
+Vector3* refract_vector3(Vector3 *direction, Vector3 *normal, float r, Vector3 *out) {
     static Vector3 temp_v = (Vector3){};
-    return vec3_sub(direction, vec3_mul(normal, 2 * vec3_dot(direction, normal), &temp_v), out);
+    float c = vec3_dot(vec3_neg(normal, &temp_v), direction);
+    float s =  1 - r * r * (1 - c * c);
+    return s < 0 ? NULL : vec3_add(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * c - sqrt(s), out), out);
 }
 
 float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
     static Vector3 offset = (Vector3){};
-    vec3_add(position, axis, &offset);
-    float distance = instance->get_distance(instance, &offset);
-    vec3_sub(position, axis, &offset);
-    distance -= instance->get_distance(instance, &offset);
-    return distance;
+    float distance = instance->get_distance(instance, vec3_add(position, axis, &offset));
+    return distance - instance->get_distance(instance, vec3_sub(position, axis, &offset));
 }
 
 Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
@@ -83,21 +85,6 @@ Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-SDFInstance* ray_march_transmit(Scene *self, Ray *r, Vector3 *normal, float t_max, Vector3 *out) {
-    static Vector3 temp_v = (Vector3){};
-    static Vector3 temp_r_origin = (Vector3){};
-    static Vector3 temp_r_direction = (Vector3){};
-    static Ray temp_r = (Ray){&temp_r_origin, &temp_r_direction};
-    perturb_vector3(r->origin, vec3_neg(normal, &temp_v), &temp_r_origin);
-    vec3_cpy(r->direction, &temp_r_direction);
-    //TODO refract direction
-    return ray_march(
-        self,
-        &temp_r,
-        t_max,
-        out
-    );
-}
 //TODO take instance transmission into account
 Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
     static Color3 temp_c = (Color3){};
@@ -122,9 +109,11 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
     return out;
 }
 
-Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color3 *out) {
+//TODO turn this from a recursive approach to an iterative approach
+//Use pointer as a FILO stack for hit position, instance, etc.
+//Hopefully can take advantage of cached data for some sort of speedup?
+Color3* get_color(Scene *self, Ray *r, int recursion_depth, float *ior_stack, float alpha, Color3 *out) {
     static Color3 temp_c = (Color3){};
-    static Vector3 temp_v = (Vector3){};
     Vector3 *position = vector3(0, 0, 0);
     SDFInstance *hit_instance = ray_march(
         self,
@@ -136,38 +125,41 @@ Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color
         float reflectance_multiplier = hit_instance->material->reflectance;
         float transmission_multiplier = (1 - reflectance_multiplier) * hit_instance->material->transmission;
         float diffuse_multiplier = (1 - reflectance_multiplier) * (1 - hit_instance->material->transmission);
-        int has_transmission = transmission_multiplier > EPSILON && remaining_bounces;
+        int recursion_depth_reached = recursion_depth == SCENE_RECURSION_DEPTH;
+        int has_transmission = transmission_multiplier > EPSILON;
         int has_diffuse = diffuse_multiplier > EPSILON;
-        int has_reflectance = reflectance_multiplier > EPSILON && remaining_bounces;
+        int has_reflectance = reflectance_multiplier > EPSILON;
         Color3 *instance_color = hit_instance->material->color;
         Vector3 *normal = get_normal(hit_instance, position, vector3(0, 0, 0));
         Ray *second_ray = has_transmission || has_reflectance ? ray(vector3(0, 0, 0), vector3(0, 0, 0)) : NULL;
-        //Transmission contribution
-        if (has_transmission) {
-            vec3_cpy(position, second_ray->origin);
-            vec3_cpy(r->direction, second_ray->direction);
-            SDFInstance *second_hit_instance = ray_march_transmit(
-                self,
-                second_ray,
-                normal,
-                SCENE_MARCH_DIST_MAX,
-                second_ray->origin
-            );
-            perturb_vector3(second_ray->origin, get_normal(second_hit_instance, second_ray->origin, &temp_v), second_ray->origin);
-            //ray_march_transmit(self, second_ray, normal, SCENE_MARCH_DIST_MAX, second_ray->origin);
-            get_color(self, second_ray, remaining_bounces - 1, alpha * transmission_multiplier, out);
+        if (vec3_dot(r->direction, normal) > 0) {   //If the ray exited an instance
+            vec3_neg(normal, normal);
+            ior_stack--;
         }
         //Diffuse contribution
         if (has_diffuse) {
             Color3 *light_color = get_light_color(self, position, normal, &temp_c);
             Color3 *diffuse_color = col3_mul(instance_color, light_color, &temp_c);
+            if (hit_instance->material->checker) {
+                col3_smul(diffuse_color, ((int)floor(position->x / 2) % 2 + (int)floor(position->y / 2) % 2 + (int)floor(position->z / 2) % 2) % 2 ? 1 : .375, diffuse_color);
+            }
             col3_add(out, col3_smul(diffuse_color, alpha * diffuse_multiplier, &temp_c), out);
         }
-        //Reflectance contribution
-        if (has_reflectance) {
-            perturb_vector3(position, normal, second_ray->origin);
-            reflect_vector3(r->direction, normal, second_ray->direction);
-            get_color(self, second_ray, remaining_bounces - 1, alpha * reflectance_multiplier, out);
+        if (!recursion_depth_reached) {
+            //Transmission contribution
+            if (has_transmission) {
+                perturb_vector3(position, vec3_neg(normal, second_ray->origin), second_ray->origin);
+                if (refract_vector3(r->direction, normal, *ior_stack / hit_instance->material->ior, second_ray->direction)) {
+                    *++ior_stack = hit_instance->material->ior;
+                    get_color(self, second_ray, recursion_depth + 1, ior_stack, alpha * transmission_multiplier, out);
+                }
+            }
+            //Reflectance contribution
+            if (has_reflectance) {
+                perturb_vector3(position, normal, second_ray->origin);
+                reflect_vector3(r->direction, normal, second_ray->direction);
+                get_color(self, second_ray, recursion_depth + 1, ior_stack, alpha * reflectance_multiplier, out);
+            }
         }
         free(normal);
         if (second_ray) {
@@ -177,6 +169,45 @@ Color3* get_color(Scene *self, Ray *r, int remaining_bounces, float alpha, Color
         }
     }
     free(position);
+    return out;
+}
+
+Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
+    static int *depth_stack = NULL;
+    static float *ior_stack = NULL;
+    static Vector3 **position_stack = NULL;
+    static Ray **ray_stack = NULL;
+    if (!ior_stack) {   //Initialize static temp variables
+        int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
+        assert((depth_stack = malloc(sizeof(int) * stack_size)));
+        assert((ior_stack = malloc(sizeof(float) * stack_size)));
+        assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
+        assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
+        for (int i = 0; i < stack_size; i++) {
+            *(position_stack + i) = vector3(0, 0, 0);
+            *(ray_stack + i) = ray(vector3(0, 0, 0), vector3(0, 0, 0));
+        }
+    }
+    *depth_stack = 0;
+    *ior_stack = SCENE_AIR_IOR; //TODO correct if ray origin is inside instance
+    printf("Ayo\n");
+    vec3_cpy(r->origin, (*ray_stack)->origin);
+    vec3_cpy(r->direction, (*ray_stack)->direction);
+    printf("Hey\n");
+    col3_mul(out, 0, out);
+    int offset = 0;
+    while (offset >= 0) {
+        SDFInstance *hit_instance = ray_march(
+            self,
+            *(ray_stack + offset),
+            SCENE_MARCH_DIST_MAX,
+            *(position_stack + offset)
+        );
+        if (hit_instance) {
+            col3_add(out, hit_instance->material->color, out);
+        }
+        offset--;
+    }
     return out;
 }
 
@@ -195,12 +226,14 @@ Color3* tonemap(Color3 *c, Color3 *out) {
 unsigned int* render(Scene *self, Camera *camera) {
     unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
     assert(output);
+    float *ior_stack = malloc(sizeof(float *) * SCENE_RECURSION_DEPTH);
+    assert(ior_stack);
     Color3 *temp_c = color3(0, 0, 0);
     Color3 *temp_cout = color3(0, 0, 0);
     Vector3 *temp_v1 = vector3(0, 0, 0);
     Vector3 *temp_v2 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
-    float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
+    //float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;
@@ -213,13 +246,15 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    col3_add(temp_cout, get_color(self, temp_r, SCENE_REFLECTIONS_MAX, alpha, col3_smul(temp_c, 0, temp_c)), temp_cout);
+                    *ior_stack = SCENE_AIR_IOR;
+                    //col3_add(temp_cout, get_color(self, temp_r, 0, ior_stack, alpha, col3_smul(temp_c, 0, temp_c)), temp_cout);
+                    col3_add(temp_cout, get_color_iterative(self, temp_r, temp_c), temp_cout);
                 }
             }
             *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(col3_clamp(tonemap(temp_cout, temp_cout), temp_cout));
         }
     }
-    printf("%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
+    fprintf(stderr, "%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
     free(temp_c);
     free(temp_cout);
     free(temp_r);

@@ -29,5 +29,4 @@ clean:
 
 png:
 	make
-	./draw
-	./pnmtopng output.ppm > output.png
+	./draw | ./pnmtopng > output.png

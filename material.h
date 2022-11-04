@@ -5,8 +5,10 @@
 
 typedef struct Material {
     Color3 *color;
+    float ior;
     float reflectance;
     float transmission;
+    int checker;
 } Material;
 
 Material* material();
