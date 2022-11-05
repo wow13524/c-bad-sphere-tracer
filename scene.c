@@ -190,11 +190,9 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     }
     *depth_stack = 0;
     *ior_stack = SCENE_AIR_IOR; //TODO correct if ray origin is inside instance
-    printf("Ayo\n");
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
-    printf("Hey\n");
-    col3_mul(out, 0, out);
+    col3_smul(out, 0, out);
     int offset = 0;
     while (offset >= 0) {
         SDFInstance *hit_instance = ray_march(
@@ -226,14 +224,14 @@ Color3* tonemap(Color3 *c, Color3 *out) {
 unsigned int* render(Scene *self, Camera *camera) {
     unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
     assert(output);
-    float *ior_stack = malloc(sizeof(float *) * SCENE_RECURSION_DEPTH);
-    assert(ior_stack);
+    //float *ior_stack = malloc(sizeof(float *) * SCENE_RECURSION_DEPTH);
+    //assert(ior_stack);
     Color3 *temp_c = color3(0, 0, 0);
     Color3 *temp_cout = color3(0, 0, 0);
     Vector3 *temp_v1 = vector3(0, 0, 0);
     Vector3 *temp_v2 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
-    //float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
+    float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;
@@ -246,9 +244,9 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    *ior_stack = SCENE_AIR_IOR;
+                    //*ior_stack = SCENE_AIR_IOR;
                     //col3_add(temp_cout, get_color(self, temp_r, 0, ior_stack, alpha, col3_smul(temp_c, 0, temp_c)), temp_cout);
-                    col3_add(temp_cout, get_color_iterative(self, temp_r, temp_c), temp_cout);
+                    col3_add(temp_cout, col3_smul(get_color_iterative(self, temp_r, temp_c), alpha, temp_c), temp_cout);
                 }
             }
             *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(col3_clamp(tonemap(temp_cout, temp_cout), temp_cout));
