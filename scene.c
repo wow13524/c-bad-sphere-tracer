@@ -21,18 +21,23 @@ void add_light(Scene *self, Light *light) {
 float map(Scene *self, Vector3 *position, SDFInstance **out) {
     *out = *self->instances;
     float closest_distance = (*out)->get_distance(*out, position);
-    SDFInstance *instance = NULL;
     for (int j = 1; j < self->instance_count; j++) {
-        instance = *(self->instances + j);
+        SDFInstance *instance = *(self->instances + j);
         float distance = instance->get_distance(instance, position);
         if (distance < closest_distance) {
             closest_distance = distance;
             *out = instance;
+            if (distance < EPSILON) {
+                break;
+            }
         }
     }
-    return fabs(closest_distance);
+    return closest_distance;
 }
 
+//TODO leverage explicit surface formulas
+//Leave ray marching for implicit surfaces (mandelbulb, etc.)
+//Use initial map call to determine if march direction should be reversed (for traversing through the inside of an instance)
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     marches++;
     static Vector3 temp_v = (Vector3){};
@@ -41,8 +46,9 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     float total_distance = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
         float closest_distance = map(self, position, &result);
+        float progress_distance = closest_distance < 0 ? closest_distance : closest_distance * 1.2;
         total_distance += closest_distance;
-        vec3_add(position, vec3_mul(r->direction, closest_distance, &temp_v), position);
+        vec3_add(position, vec3_mul(r->direction, progress_distance, &temp_v), position);
          if (total_distance > t_max) {
             result = NULL;
             break;
@@ -174,12 +180,14 @@ Color3* get_color(Scene *self, Ray *r, int recursion_depth, float *ior_stack, fl
 
 Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static int *depth_stack = NULL;
+    static float *alpha_stack = NULL;
     static float *ior_stack = NULL;
     static Vector3 **position_stack = NULL;
     static Ray **ray_stack = NULL;
     if (!ior_stack) {   //Initialize static temp variables
         int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
         assert((depth_stack = malloc(sizeof(int) * stack_size)));
+        assert((alpha_stack = malloc(sizeof(float) * stack_size)));
         assert((ior_stack = malloc(sizeof(float) * stack_size)));
         assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
@@ -188,12 +196,14 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             *(ray_stack + i) = ray(vector3(0, 0, 0), vector3(0, 0, 0));
         }
     }
+    *alpha_stack = 1;
     *depth_stack = 0;
     *ior_stack = SCENE_AIR_IOR; //TODO correct if ray origin is inside instance
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
     col3_smul(out, 0, out);
     int offset = 0;
+    //int ior_offset = 0;
     while (offset >= 0) {
         SDFInstance *hit_instance = ray_march(
             self,
@@ -202,6 +212,13 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             *(position_stack + offset)
         );
         if (hit_instance) {
+            /*float reflectance_alpha = hit_instance->material->reflectance;
+            float transmission_alpha = (1 - hit_instance->material->reflectance) * hit_instance->material->transmission;
+            float diffuse_alpha = (1 - hit_instance->material->reflectance) * (1 - hit_instance->material->transmission);
+            int has_transmission = transmission_alpha > SCENE_ALPHA_MIN;
+            int has_diffuse = diffuse_alpha > SCENE_ALPHA_MIN;
+            int has_reflectance = reflectance_alpha > SCENE_ALPHA_MIN;
+            Color3 *instance_color = hit_instance->material->color;*/
             col3_add(out, hit_instance->material->color, out);
         }
         offset--;
