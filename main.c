@@ -37,7 +37,7 @@ int main(void) {
     sphere_a->material->color = color3(.8, .8, 1);
     sphere_a->material->ior = 1.125;
     sphere_a->material->reflectance = .1;
-    sphere_a->material->transmission = 1;
+    sphere_a->material->transmission = .9;
 
     SDFInstance *sphere_b = sdf_instance(sphere);
     sphere_b->instance->position = vector3(5, -.5, 8);

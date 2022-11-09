@@ -35,9 +35,8 @@ float map(Scene *self, Vector3 *position, SDFInstance **out) {
     return closest_distance;
 }
 
-int is_inside_instance(Scene *self, Vector3 *position) {
-    SDFInstance *out = NULL;
-    return map(self, position, &out) < 0;
+int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
+    return map(self, position, out) < 0;
 }
 
 //TODO leverage explicit surface formulas
@@ -47,7 +46,8 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     static Vector3 temp_v = (Vector3){};
     Vector3 *position = vec3_cpy(r->origin, out);
     SDFInstance *result = NULL;
-    int direction = is_inside_instance(self, r->origin) ? -1 : 1;
+    SDFInstance *temp = NULL;
+    int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
     float total_distance = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
         float closest_distance = direction * map(self, position, &result);
@@ -58,7 +58,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
             result = NULL;
             break;
         }
-        else if (fabs(progress_distance) < EPSILON) {
+        else if (progress_distance < EPSILON) {
             break;
         }
     }
@@ -191,6 +191,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static Vector3 **position_stack = NULL;
     static Ray **ray_stack = NULL;
     static Color3 *temp_c = NULL;
+    static Vector3 *temp_v = NULL;
     if (!ior_stack) {   //Initialize static temp variables
         int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
         assert((alpha_stack = malloc(sizeof(float) * stack_size)));
@@ -200,6 +201,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
         assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
         temp_c = color3(0, 0, 0);
+        temp_v = vector3(0, 0, 0);
         for (int i = 0; i < stack_size; i++) {
             *(normal_stack + i) = vector3(0, 0, 0);
             *(position_stack + i) = vector3(0, 0, 0);
@@ -216,7 +218,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     int total = 1;
     do {
         float curr_alpha = *(alpha_stack + offset);
-        float curr_depth = *(depth_stack + offset);
+        int curr_depth = *(depth_stack + offset);
         float curr_ior = *(ior_stack + offset);
         Vector3 *curr_normal = *(normal_stack + offset);
         Vector3 *curr_position = *(position_stack + offset);
@@ -238,21 +240,33 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             }
             if (curr_depth < SCENE_RECURSION_DEPTH) {
                 if (transmission_alpha > SCENE_ALPHA_MIN) {
+                    if (r->direction->z == 1) {
+                        fprintf(stderr, "Current Alpha: %f\nCurrent Depth: %d\nCurrent IOR: %f\nCurrent Normal: <%f, %f, %f>\nCurrent Position: <%f, %f, %f>\nCurrent Ray: (<%f, %f, %f>, <%f, %f, %f>)\nHit Instance: %d\n\n",curr_alpha,curr_depth,curr_ior,curr_normal->x,curr_normal->y,curr_normal->z,curr_position->x,curr_position->y,curr_position->z,curr_ray->origin->x,curr_ray->origin->y,curr_ray->origin->z,curr_ray->direction->x,curr_ray->direction->y,curr_ray->direction->z,hit_instance!=NULL);
+                    }
+                    Ray *next_ray = *(ray_stack + total);
+                    int same_direction = vec3_dot(curr_ray->direction, curr_normal) > 0;
+                    perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), next_ray->origin);
+                    SDFInstance *next_instance = NULL;
+                    float next_ior = SCENE_AIR_IOR;
+                    if (is_inside_instance(self, next_ray->origin, &next_instance)) {
+                        next_ior = next_instance->material->ior;
+                    }
+
                     *(alpha_stack + total) = transmission_alpha;
                     *(depth_stack + total) = curr_depth + 1;
-                    *(ior_stack + total) = hit_instance->material->ior;
-                    Ray *next_ray = *(ray_stack + total);
-                    if (refract_vector3(curr_ray->direction, curr_normal, SCENE_AIR_IOR, next_ray->direction)) {
-                        perturb_vector3(curr_position, curr_normal, next_ray->origin);
+                    *(ior_stack + total) = next_ior;
+                    
+                    
+                    if (refract_vector3(curr_ray->direction, same_direction ? vec3_neg(curr_normal, temp_v) : curr_normal, curr_ior / next_ior, next_ray->direction)) {
                         total++;
                     }
                 }
-                if (reflectance_alpha > SCENE_ALPHA_MIN) {
+                if (0 && reflectance_alpha > SCENE_ALPHA_MIN) {
+                    Ray *next_ray = *(ray_stack + total);
                     *(alpha_stack + total) = reflectance_alpha;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = curr_ior;
-                    Ray *next_ray = *(ray_stack + total);
-                    perturb_vector3(curr_position, vec3_neg(curr_normal, next_ray->origin), next_ray->origin);
+                    perturb_vector3(curr_position, curr_normal, next_ray->origin);
                     reflect_vector3(curr_ray->direction, curr_normal, next_ray->direction);
                     total++;
                 }
