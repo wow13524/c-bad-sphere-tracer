@@ -41,26 +41,37 @@ int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
 
 //TODO leverage explicit surface formulas
 //Leave ray marching for implicit surfaces (mandelbulb, etc.)
+//Over-relaxation sphere tracing: https://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     marches++;
     static Vector3 temp_v = (Vector3){};
-    Vector3 *position = vec3_cpy(r->origin, out);
     SDFInstance *result = NULL;
     SDFInstance *temp = NULL;
     int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
+    float omega = 1.75;
+    float last_radius = 0;
     float total_distance = 0;
+    float next_step = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
-        float closest_distance = direction * map(self, position, &result);
-        float progress_distance = closest_distance < 0 ? closest_distance : closest_distance;// * 1.2;
-        total_distance += progress_distance;
-        vec3_add(position, vec3_mul(r->direction, progress_distance, &temp_v), position);
+        float radius = direction * map(self, vec3_add(r->origin, vec3_mul(r->direction, total_distance, &temp_v), out), &result);
+        float abs_radius = fabs(radius);
+        if (omega != 1 && omega * last_radius > last_radius + abs_radius) {
+            next_step -= omega * next_step;
+            omega = 1;
+        }
+        else {
+            next_step = omega * radius;
+        }
+        last_radius = abs_radius;
+        total_distance += next_step;
          if (total_distance > t_max) {
             result = NULL;
             break;
         }
-        else if (progress_distance < EPSILON) {
+        else if (abs_radius < EPSILON) {
             break;
         }
+
     }
     return result;
 }
@@ -75,9 +86,25 @@ Vector3* reflect_vector3(Vector3 *direction, Vector3 *normal, Vector3 *out) {
 
 Vector3* refract_vector3(Vector3 *direction, Vector3 *normal, float r, Vector3 *out) {
     static Vector3 temp_v = (Vector3){};
-    float c = vec3_dot(vec3_neg(normal, &temp_v), direction);
+    float c = vec3_dot(normal, direction);
     float s =  1 - r * r * (1 - c * c);
-    return s < 0 ? NULL : vec3_add(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * c - sqrt(s), out), out);
+    if (s < 0) {
+        return NULL;
+    } 
+    else if(c > 0) {    //Correct for when ray is leaving an object
+        return vec3_sub(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * c - sqrt(s), out), out);
+    }
+    else {
+        return vec3_add(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * -c - sqrt(s), out), out);
+    }
+}
+
+float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) {
+    float c = 1 - fabs(vec3_dot(direction, normal));
+    float r = (ior_in - ior_out) / (ior_in + ior_out);
+    r *= r;
+    return r + (1 - r) * c * c * c * c * c;
+    
 }
 
 float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
@@ -120,69 +147,6 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
     return out;
 }
 
-//TODO turn this from a recursive approach to an iterative approach
-//Use pointer as a FILO stack for hit position, instance, etc.
-//Hopefully can take advantage of cached data for some sort of speedup?
-Color3* get_color(Scene *self, Ray *r, int recursion_depth, float *ior_stack, float alpha, Color3 *out) {
-    static Color3 temp_c = (Color3){};
-    Vector3 *position = vector3(0, 0, 0);
-    SDFInstance *hit_instance = ray_march(
-        self,
-        r,
-        SCENE_MARCH_DIST_MAX,
-        position
-    );
-    if (hit_instance) {
-        float reflectance_multiplier = hit_instance->material->reflectance;
-        float transmission_multiplier = (1 - reflectance_multiplier) * hit_instance->material->transmission;
-        float diffuse_multiplier = (1 - reflectance_multiplier) * (1 - hit_instance->material->transmission);
-        int recursion_depth_reached = recursion_depth == SCENE_RECURSION_DEPTH;
-        int has_transmission = transmission_multiplier > EPSILON;
-        int has_diffuse = diffuse_multiplier > EPSILON;
-        int has_reflectance = reflectance_multiplier > EPSILON;
-        Color3 *instance_color = hit_instance->material->color;
-        Vector3 *normal = get_normal(hit_instance, position, vector3(0, 0, 0));
-        Ray *second_ray = has_transmission || has_reflectance ? ray(vector3(0, 0, 0), vector3(0, 0, 0)) : NULL;
-        if (vec3_dot(r->direction, normal) > 0) {   //If the ray exited an instance
-            vec3_neg(normal, normal);
-            ior_stack--;
-        }
-        //Diffuse contribution
-        if (has_diffuse) {
-            Color3 *light_color = get_light_color(self, position, normal, &temp_c);
-            Color3 *diffuse_color = col3_mul(instance_color, light_color, &temp_c);
-            if (hit_instance->material->checker) {
-                col3_smul(diffuse_color, ((int)floor(position->x / 2) % 2 + (int)floor(position->y / 2) % 2 + (int)floor(position->z / 2) % 2) % 2 ? 1 : .375, diffuse_color);
-            }
-            col3_add(out, col3_smul(diffuse_color, alpha * diffuse_multiplier, &temp_c), out);
-        }
-        if (!recursion_depth_reached) {
-            //Transmission contribution
-            if (has_transmission) {
-                perturb_vector3(position, vec3_neg(normal, second_ray->origin), second_ray->origin);
-                if (refract_vector3(r->direction, normal, *ior_stack / hit_instance->material->ior, second_ray->direction)) {
-                    *++ior_stack = hit_instance->material->ior;
-                    get_color(self, second_ray, recursion_depth + 1, ior_stack, alpha * transmission_multiplier, out);
-                }
-            }
-            //Reflectance contribution
-            if (has_reflectance) {
-                perturb_vector3(position, normal, second_ray->origin);
-                reflect_vector3(r->direction, normal, second_ray->direction);
-                get_color(self, second_ray, recursion_depth + 1, ior_stack, alpha * reflectance_multiplier, out);
-            }
-        }
-        free(normal);
-        if (second_ray) {
-            free(second_ray->origin);
-            free(second_ray->direction);
-            free(second_ray);
-        }
-    }
-    free(position);
-    return out;
-}
-
 Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static float *alpha_stack = NULL;
     static int *depth_stack = NULL;
@@ -191,6 +155,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static Vector3 **position_stack = NULL;
     static Ray **ray_stack = NULL;
     static Color3 *temp_c = NULL;
+    static SDFInstance *temp_i = NULL;
     static Vector3 *temp_v = NULL;
     if (!ior_stack) {   //Initialize static temp variables
         int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
@@ -208,14 +173,16 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             *(ray_stack + i) = ray(vector3(0, 0, 0), vector3(0, 0, 0));
         }
     }
+
     *alpha_stack = 1;
     *depth_stack = 0;
-    *ior_stack = SCENE_AIR_IOR; //TODO correct if ray origin is inside instance
+    *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_AIR_IOR;
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
     col3_smul(out, 0, out);
     int offset = 0;
     int total = 1;
+
     do {
         float curr_alpha = *(alpha_stack + offset);
         int curr_depth = *(depth_stack + offset);
@@ -229,39 +196,50 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             SCENE_MARCH_DIST_MAX,
             curr_position
         );
+
         if (hit_instance) {
-            float reflectance_alpha = curr_alpha * hit_instance->material->reflectance;
-            float transmission_alpha = curr_alpha * (1 - hit_instance->material->reflectance) * hit_instance->material->transmission;
-            float diffuse_alpha = curr_alpha * (1 - hit_instance->material->reflectance) * (1 - hit_instance->material->transmission);
             get_normal(hit_instance, curr_position, curr_normal);
+            SDFInstance *next_instance = NULL;
+            int same_direction = vec3_dot(curr_ray->direction, curr_normal) > 0;
+            float next_ior = SCENE_AIR_IOR;
+            perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), temp_v);
+            if (is_inside_instance(self, temp_v, &next_instance)) {
+                next_ior = next_instance->material->ior;
+            }
+
+            float reflectance = hit_instance->material->reflectance;
+            float fresnel_add = fresnel(curr_ray->direction, curr_normal, curr_ior, next_ior) * (1 - reflectance);
+
+            float reflectance_alpha = curr_alpha * (reflectance + fresnel_add);
+            float transmission_alpha = curr_alpha * (1 - (reflectance + fresnel_add)) * hit_instance->material->transmission;
+            float diffuse_alpha = curr_alpha * (1 - reflectance) * (1 - hit_instance->material->transmission);
+
             if (diffuse_alpha > SCENE_ALPHA_MIN) {
                 Color3 *light_color = get_light_color(self, curr_position, curr_normal, temp_c);
+                if (hit_instance->material->checker) {
+                    diffuse_alpha *= ((int)floor(curr_position->x / 2) % 2 + (int)floor(curr_position->y / 2) % 2 + (int)floor(curr_position->z / 2) % 2) % 2 ? 1 : .375;
+                }
                 col3_add(out, col3_smul(col3_mul(light_color, hit_instance->material->color, temp_c), diffuse_alpha, temp_c), out);
             }
+
             if (curr_depth < SCENE_RECURSION_DEPTH) {
                 if (transmission_alpha > SCENE_ALPHA_MIN) {
-                    if (r->direction->z == 1) {
-                        fprintf(stderr, "Current Alpha: %f\nCurrent Depth: %d\nCurrent IOR: %f\nCurrent Normal: <%f, %f, %f>\nCurrent Position: <%f, %f, %f>\nCurrent Ray: (<%f, %f, %f>, <%f, %f, %f>)\nHit Instance: %d\n\n",curr_alpha,curr_depth,curr_ior,curr_normal->x,curr_normal->y,curr_normal->z,curr_position->x,curr_position->y,curr_position->z,curr_ray->origin->x,curr_ray->origin->y,curr_ray->origin->z,curr_ray->direction->x,curr_ray->direction->y,curr_ray->direction->z,hit_instance!=NULL);
-                    }
                     Ray *next_ray = *(ray_stack + total);
-                    int same_direction = vec3_dot(curr_ray->direction, curr_normal) > 0;
-                    perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), next_ray->origin);
-                    SDFInstance *next_instance = NULL;
-                    float next_ior = SCENE_AIR_IOR;
-                    if (is_inside_instance(self, next_ray->origin, &next_instance)) {
-                        next_ior = next_instance->material->ior;
-                    }
-
+                    vec3_cpy(temp_v, next_ray->origin);
                     *(alpha_stack + total) = transmission_alpha;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = next_ior;
                     
+                    if (r->direction->z == 1) {
+                        //fprintf(stderr, "Current Alpha: %f\nCurrent Depth: %d\nCurrent IOR: %f\nNext IOR: %f\nCurrent Normal: <%f, %f, %f>\nCurrent Position: <%f, %f, %f>\nCurrent Ray: (<%f, %f, %f>, <%f, %f, %f>)\nHit Instance: %d\n\n",curr_alpha,curr_depth,curr_ior,next_ior,curr_normal->x,curr_normal->y,curr_normal->z,curr_position->x,curr_position->y,curr_position->z,curr_ray->origin->x,curr_ray->origin->y,curr_ray->origin->z,curr_ray->direction->x,curr_ray->direction->y,curr_ray->direction->z,hit_instance!=NULL);
+                    }
                     
-                    if (refract_vector3(curr_ray->direction, same_direction ? vec3_neg(curr_normal, temp_v) : curr_normal, curr_ior / next_ior, next_ray->direction)) {
+                    if (refract_vector3(curr_ray->direction, curr_normal, curr_ior / next_ior, next_ray->direction)) {
                         total++;
                     }
                 }
-                if (0 && reflectance_alpha > SCENE_ALPHA_MIN) {
+
+                if (reflectance_alpha > SCENE_ALPHA_MIN) {
                     Ray *next_ray = *(ray_stack + total);
                     *(alpha_stack + total) = reflectance_alpha;
                     *(depth_stack + total) = curr_depth + 1;
@@ -273,6 +251,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             }
         }
     } while (++offset < total);
+
     return out;
 }
 
@@ -291,8 +270,6 @@ Color3* tonemap(Color3 *c, Color3 *out) {
 unsigned int* render(Scene *self, Camera *camera) {
     unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
     assert(output);
-    //float *ior_stack = malloc(sizeof(float *) * SCENE_RECURSION_DEPTH);
-    //assert(ior_stack);
     Color3 *temp_c = color3(0, 0, 0);
     Color3 *temp_cout = color3(0, 0, 0);
     Vector3 *temp_v1 = vector3(0, 0, 0);
@@ -311,8 +288,6 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    //*ior_stack = SCENE_AIR_IOR;
-                    //col3_add(temp_cout, get_color(self, temp_r, 0, ior_stack, alpha, col3_smul(temp_c, 0, temp_c)), temp_cout);
                     col3_add(temp_cout, col3_smul(get_color_iterative(self, temp_r, temp_c), alpha, temp_c), temp_cout);
                 }
             }
