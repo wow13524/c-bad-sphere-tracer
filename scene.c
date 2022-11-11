@@ -149,24 +149,34 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
 
 Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static float *alpha_stack = NULL;
+    static int *back_stack = NULL;
     static int *depth_stack = NULL;
     static float *ior_stack = NULL;
+    static SDFInstance **instance_stack = NULL;
     static Vector3 **normal_stack = NULL;
     static Vector3 **position_stack = NULL;
     static Ray **ray_stack = NULL;
     static Color3 *temp_c = NULL;
     static SDFInstance *temp_i = NULL;
     static Vector3 *temp_v = NULL;
+    static Color3 *attenuation_color = NULL;
+    static Color3 *light_color = NULL;
+    static Vector3 *perturbed_position = NULL;
     if (!ior_stack) {   //Initialize static temp variables
         int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
         assert((alpha_stack = malloc(sizeof(float) * stack_size)));
+        assert((back_stack = malloc(sizeof(int) * stack_size)));
         assert((depth_stack = malloc(sizeof(int) * stack_size)));
         assert((ior_stack = malloc(sizeof(float) * stack_size)));
+        assert((instance_stack = malloc(sizeof(SDFInstance *) * stack_size)));
         assert((normal_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
         temp_c = color3(0, 0, 0);
         temp_v = vector3(0, 0, 0);
+        attenuation_color = color3(0, 0, 0);
+        light_color = color3(0, 0, 0);
+        perturbed_position = vector3(0, 0, 0);
         for (int i = 0; i < stack_size; i++) {
             *(normal_stack + i) = vector3(0, 0, 0);
             *(position_stack + i) = vector3(0, 0, 0);
@@ -175,16 +185,21 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     }
 
     *alpha_stack = 1;
+    *back_stack = -1;
     *depth_stack = 0;
-    *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_AIR_IOR;
+    *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_ATMOSPHERE_IOR;
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
+    attenuation_color->r = 1;
+    attenuation_color->g = 1;
+    attenuation_color->b = 1;
     col3_smul(out, 0, out);
     int offset = 0;
     int total = 1;
 
     do {
         float curr_alpha = *(alpha_stack + offset);
+        int curr_back = *(back_stack + offset);
         int curr_depth = *(depth_stack + offset);
         float curr_ior = *(ior_stack + offset);
         Vector3 *curr_normal = *(normal_stack + offset);
@@ -199,11 +214,12 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
 
         if (hit_instance) {
             get_normal(hit_instance, curr_position, curr_normal);
+            *(instance_stack + offset) = hit_instance;
             SDFInstance *next_instance = NULL;
             int same_direction = vec3_dot(curr_ray->direction, curr_normal) > 0;
-            float next_ior = SCENE_AIR_IOR;
-            perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), temp_v);
-            if (is_inside_instance(self, temp_v, &next_instance)) {
+            float next_ior = SCENE_ATMOSPHERE_IOR;
+            perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), perturbed_position);
+            if (is_inside_instance(self, perturbed_position, &next_instance)) {
                 next_ior = next_instance->material->ior;
             }
 
@@ -214,19 +230,23 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             float transmission_alpha = curr_alpha * (1 - (reflectance + fresnel_add)) * hit_instance->material->transmission;
             float diffuse_alpha = curr_alpha * (1 - reflectance) * (1 - hit_instance->material->transmission);
 
+            if (is_inside_instance(self, curr_ray->origin, &next_instance)) {   //Beer's Law
+                col3_mul(attenuation_color, col3_exp(col3_smul(col3_log((*(instance_stack + curr_back))->material->color, temp_c), vec3_mag(vec3_sub(curr_position, *(position_stack + curr_back), temp_v)), temp_c), temp_c), attenuation_color);
+            }
             if (diffuse_alpha > SCENE_ALPHA_MIN) {
-                Color3 *light_color = get_light_color(self, curr_position, curr_normal, temp_c);
+                get_light_color(self, curr_position, curr_normal, light_color);
                 if (hit_instance->material->checker) {
                     diffuse_alpha *= ((int)floor(curr_position->x / 2) % 2 + (int)floor(curr_position->y / 2) % 2 + (int)floor(curr_position->z / 2) % 2) % 2 ? 1 : .375;
                 }
-                col3_add(out, col3_smul(col3_mul(light_color, hit_instance->material->color, temp_c), diffuse_alpha, temp_c), out);
+                col3_add(out, col3_smul(col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), attenuation_color, temp_c), diffuse_alpha, temp_c), out);
             }
 
             if (curr_depth < SCENE_RECURSION_DEPTH) {
                 if (transmission_alpha > SCENE_ALPHA_MIN) {
                     Ray *next_ray = *(ray_stack + total);
-                    vec3_cpy(temp_v, next_ray->origin);
+                    vec3_cpy(perturbed_position, next_ray->origin);
                     *(alpha_stack + total) = transmission_alpha;
+                    *(back_stack + total) = offset;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = next_ior;
                     
@@ -242,6 +262,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                 if (reflectance_alpha > SCENE_ALPHA_MIN) {
                     Ray *next_ray = *(ray_stack + total);
                     *(alpha_stack + total) = reflectance_alpha;
+                    *(back_stack + total) = offset;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = curr_ior;
                     perturb_vector3(curr_position, curr_normal, next_ray->origin);
