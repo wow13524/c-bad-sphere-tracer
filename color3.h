@@ -10,7 +10,7 @@ typedef struct Color3 {
 } Color3;
 
 Color3* color3(float r, float g, float b);
-int col3_to_int(Color3 *a);
+unsigned int col3_to_int(Color3 *a);
 Color3* col3_cpy(Color3 *a, Color3 *out);
 Color3* col3_clamp(Color3 *a, Color3 *out);
 Color3* col3_exp(Color3 *a, Color3 *out);

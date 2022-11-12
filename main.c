@@ -2,11 +2,15 @@
 #include <stdlib.h>
 #include <math.h>
 #include "camera.h"
+#include "hdri.h"
 #include "light.h"
 #include "render_output.h"
 #include "scene.h"
 
 int main(void) {
+    Hdri *environment = hdri("clarens_night_02_2k.hdr");
+    (void) environment;
+
     Light *ambient = light(ambient_light, ALWAYS_VISIBLE);
     ambient->instance->size = vector3(.375, 0, 0);
 

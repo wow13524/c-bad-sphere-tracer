@@ -15,7 +15,7 @@ Color3* color3(float r, float g, float b) {
     return a;
 }
 
-int col3_to_int(Color3 *a) {
+unsigned int col3_to_int(Color3 *a) {
     return ((int)(255 * a->r) << 16) + ((int)(255 * a->g) << 8) + (int)(255 * a->b);
 }
 
