@@ -1,8 +1,69 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 #include "hdri.h"
+
+//Implements a generator to decode run length encoding of .hdr files
+int rle_next_byte(RleDecoder *self) {
+    if (!self->ctr_row) {
+        fseek(self->stream, 2, SEEK_CUR);
+        self->ctr_row = 4 * ((fgetc(self->stream) << 8) + fgetc(self->stream));
+    }
+    self->ctr_row--;
+    if (!self->ctr) {
+        int count = fgetc(self->stream);
+        if (count > 128) {
+            self->mode = 1;
+            self->ctr = count - 128;
+            self->last = fgetc(self->stream);
+        }
+        else {
+            self->mode = 0;
+            self->ctr = count;
+        }
+    }
+    self->ctr--;
+    if (self->mode) {
+        return self->last;
+    }
+    else {
+        return fgetc(self->stream);
+    }
+}
+
+RleDecoder* rle_decoder(FILE *stream) {
+    RleDecoder *x = malloc(sizeof(RleDecoder));
+    assert(x);
+    x->stream = stream;
+    x->mode = 0;
+    x->ctr = 0;
+    x->ctr_row = 0;
+    x->last = 0;
+    return x;
+}
+
+Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
+    float u = fmod(atan(direction->z / direction->x) / M_PI + .25, 1);
+    float v = fmod(-atan(direction->y / sqrt(direction->x * direction->x + direction->z * direction->z)) / M_PI + .5, 1);
+    if (u != u) {
+        u = 0;
+    }
+    else if (u < 0) {
+        u += 1;
+    }
+    if (v != v) {
+        v = 0;
+    }
+    else if (v < 0) {
+        v += 1;
+    }
+    int x = u * (self->size_x - 1);
+    int y = v * (self->size_y - 1);
+
+    return col3_cpy(*(self->data + y * self->size_x + x), out);
+}
 
 Hdri* hdri(char *filename) {
     Hdri *x = malloc(sizeof(Hdri));
@@ -17,7 +78,7 @@ Hdri* hdri(char *filename) {
         return NULL;
     }
     if (!strcmp(fgets(buf, READ_BUF_SIZE, file),"FORMAT=32-bit_rle_rgbe")) {
-        fprintf(stderr, "%s is not of format 32-but_rle_rgbe\n", filename);
+        fprintf(stderr, "%s is not of format 32-bit_rle_rgbe\n", filename);
         free(buf);
         fclose(file);
         return NULL;
@@ -42,20 +103,30 @@ Hdri* hdri(char *filename) {
         return NULL;
     }
 
-    x->data = malloc(sizeof(unsigned int) * x->size_x * x->size_y);
+    x->data = malloc(sizeof(Color3 *) * x->size_x * x->size_y);
     assert(x->data);
+    for (unsigned int i = 0; i < x->size_y * x->size_x; i++) {
+        *(x->data + i) = color3(0, 0, 0);
+    }
 
-    //implement some sort of generator for this that will output the next uncompressed byte
-    for (int i = 0; i < x->size_y; i++) {
-        fgets(buf, 4, file);    //skip first 4 bytes of each row
-        for (int j = 0; j < x->size_x; j++) {
-            int c = fgetc(file);
-            if (c > 128) {
+    RleDecoder *decoder = rle_decoder(file);
 
-            }
-            else {
-                for (int k = 0; k < c; k++) {
-                    
+    for (unsigned int i = 0; i < x->size_y; i++) {
+        for (int j = 0; j < 4; j++) {
+            for (unsigned int k = 0; k < x->size_x; k++) {
+                int c = rle_next_byte(decoder);
+                Color3 *color = *(x->data + i * x->size_x + k);
+                if (j == 0) {
+                    color->r = c;
+                }
+                else if (j == 1) {
+                    color->g = c;
+                }
+                else if (j == 2) {
+                    color->b = c;
+                }
+                else if (j == 3) {
+                    col3_smul(color, pow(2, c - 136), color);
                 }
             }
         }
@@ -63,6 +134,8 @@ Hdri* hdri(char *filename) {
 
     free(buf);
     fclose(file);
+
+    x->sample = sample;
 
     return x;
 }

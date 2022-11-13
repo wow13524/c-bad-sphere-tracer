@@ -1,4 +1,5 @@
 #include "camera.h"
+#include "hdri.h"
 #include "light.h"
 #include "sdf_instance.h"
 
@@ -11,14 +12,15 @@
 #define SCENE_LIGHTS_MAX 8
 #define SCENE_MARCH_DIST_MAX 2048
 #define SCENE_MARCH_ITER_MAX 2048
-#define SCENE_OUTPUT_HEIGHT (108 + 0 * 45)
-#define SCENE_OUTPUT_WIDTH (int)(192 + 0 * 80 * (17. / 7.))
-#define SCENE_OUTPUT_SAMPLES 1
+#define SCENE_OUTPUT_HEIGHT (1080 + 0 * 45)
+#define SCENE_OUTPUT_WIDTH (int)(1920 + 0 * 80 * (17. / 7.))
+#define SCENE_OUTPUT_SAMPLES 3
 #define SCENE_RECURSION_DEPTH 8
 
 typedef struct Scene {
     int instance_count;
     int light_count;
+    Hdri *environment;
     SDFInstance **instances;
     Light **lights;
     void (*add_instance)(struct Scene *self, SDFInstance *instance);

@@ -9,7 +9,6 @@
 
 int main(void) {
     Hdri *environment = hdri("clarens_night_02_2k.hdr");
-    (void) environment;
 
     Light *ambient = light(ambient_light, ALWAYS_VISIBLE);
     ambient->instance->size = vector3(.375, 0, 0);
@@ -47,23 +46,30 @@ int main(void) {
     sphere_b->instance->position = vector3(5, -.5, 8);
     sphere_b->instance->size = vector3(4, 0, 0);
     sphere_b->material->color = color3(.8, 1, .8);
-    sphere_b->material->reflectance = .5;
+    sphere_b->material->ior = 1.25;
+    sphere_b->material->reflectance = .1;
+    sphere_b->material->transmission = 1;
 
     SDFInstance *sphere_c = sdf_instance(sphere);
     sphere_c->instance->position = vector3(-2, 1, 2.5);
     sphere_c->instance->size = vector3(1, 0, 0);
     sphere_c->material->color = color3(.8, 0, .8);
-    sphere_c->material->reflectance = .5;
+    sphere_c->material->ior = 1.5;
+    sphere_c->material->reflectance = .1;
+    sphere_c->material->transmission = 1;
 
     SDFInstance *sphere_d = sdf_instance(sphere);
     sphere_d->instance->position = vector3(-3.75, 2.5, 12.5);
     sphere_d->instance->size = vector3(10, 0, 0);
-    sphere_d->material->color = color3(0, .8, .8);
-    sphere_d->material->reflectance = .5;
+    sphere_d->material->color = color3(.5, .8, .8);
+    sphere_d->material->ior = 2;
+    sphere_d->material->reflectance = .1;
+    sphere_d->material->transmission = 1;
 
     Camera *cam = perspective_camera(70 * M_PI / 180, 16. / 9.);
 
     Scene *s = scene();
+    s->environment = environment;
     s->add_instance(s, ground_plane);
     s->add_instance(s, sphere_a);
     s->add_instance(s, sphere_b);

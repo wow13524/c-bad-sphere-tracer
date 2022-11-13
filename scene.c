@@ -163,7 +163,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static Color3 *light_color = NULL;
     static Vector3 *perturbed_position = NULL;
     if (!ior_stack) {   //Initialize static temp variables
-        int stack_size = pow(SCENE_RECURSION_DEPTH, 2);
+        int stack_size = pow(SCENE_RECURSION_DEPTH, 3);
         assert((alpha_stack = malloc(sizeof(float) * stack_size)));
         assert((back_stack = malloc(sizeof(int) * stack_size)));
         assert((depth_stack = malloc(sizeof(int) * stack_size)));
@@ -271,6 +271,9 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                 }
             }
         }
+        else {
+            col3_add(out, col3_smul(col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), attenuation_color, temp_c), curr_alpha, temp_c), out);
+        }
     } while (++offset < total);
 
     return out;
@@ -325,14 +328,15 @@ unsigned int* render(Scene *self, Camera *camera) {
 }
 
 Scene* scene() {
-    Scene* x = malloc(sizeof(Scene));
+    Scene *x = malloc(sizeof(Scene));
     assert(x);
-    SDFInstance** instances = malloc(sizeof(SDFInstance *) * SCENE_INSTANCES_MAX);
+    SDFInstance **instances = malloc(sizeof(SDFInstance *) * SCENE_INSTANCES_MAX);
     assert(instances);
-    Light** lights = malloc(sizeof(Light *) * SCENE_LIGHTS_MAX);
+    Light **lights = malloc(sizeof(Light *) * SCENE_LIGHTS_MAX);
     assert(lights);
     x->instance_count = 0;
     x->light_count = 0;
+    x->environment = NULL;
     x->instances = instances;
     x->lights = lights;
     x->add_instance = add_instance;
