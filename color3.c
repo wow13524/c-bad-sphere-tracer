@@ -74,3 +74,10 @@ Color3* col3_sdiv(Color3 *a, float c, Color3 *out) {
     out->b = a->b / c;
     return out;
 }
+
+Color3* col3_lerp(Color3 *a, Color3 *b, float c, Color3 *out) {
+    out->r = a->r + c * (b->r - a->r);
+    out->g = a->g + c * (b->g - a->g);
+    out->b = a->b + c * (b->b - a->b);
+    return out;
+}

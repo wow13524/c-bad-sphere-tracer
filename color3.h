@@ -19,5 +19,6 @@ Color3* col3_add(Color3 *a, Color3 *b, Color3 *out);
 Color3* col3_mul(Color3 *a, Color3 *b, Color3 *out);
 Color3* col3_smul(Color3 *a, float c, Color3 *out);
 Color3* col3_sdiv(Color3 *a, float c, Color3 *out);
+Color3* col3_lerp(Color3 *a, Color3 *b, float c, Color3 *out);
 
 #endif
