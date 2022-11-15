@@ -8,7 +8,7 @@
 #include "scene.h"
 
 int main(void) {
-    Hdri *environment = hdri("clarens_night_02_2k.hdr");
+    Hdri *environment = hdri("clarens_night_02_4k.hdr");
 
     Light *ambient = light(ambient_light, ALWAYS_VISIBLE);
     ambient->instance->size = vector3(.375, 0, 0);
@@ -70,7 +70,7 @@ int main(void) {
 
     Scene *s = scene();
     s->environment = environment;
-    s->add_instance(s, ground_plane);
+    /*s->add_instance(s, ground_plane);
     s->add_instance(s, sphere_a);
     s->add_instance(s, sphere_b);
     s->add_instance(s, sphere_c);
@@ -78,7 +78,7 @@ int main(void) {
     s->add_light(s, ambient);
     s->add_light(s, point_light_a);
     s->add_light(s, point_light_b);
-    s->add_light(s, point_light_c);
+    s->add_light(s, point_light_c);*/
 
     render_to_ppm(s->render(s, cam));
 

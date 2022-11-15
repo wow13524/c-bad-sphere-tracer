@@ -19,6 +19,10 @@ void add_light(Scene *self, Light *light) {
 }
 
 float map(Scene *self, Vector3 *position, SDFInstance **out) {
+    if (!self->instance_count) {
+        *out = NULL;
+        return FLT_MAX;
+    }
     *out = *self->instances;
     float closest_distance = (*out)->get_distance(*out, position);
     for (int j = 1; j < self->instance_count; j++) {
