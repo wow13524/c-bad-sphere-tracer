@@ -215,7 +215,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             SCENE_MARCH_DIST_MAX,
             curr_position
         );
-
+        //TODO correct beers law by tracking attenuation color separately
         if (hit_instance) {
             get_normal(hit_instance, curr_position, curr_normal);
             *(instance_stack + offset) = hit_instance;
@@ -253,11 +253,6 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                     *(back_stack + total) = offset;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = next_ior;
-                    
-                    if (r->direction->z == 1) {
-                        //fprintf(stderr, "Current Alpha: %f\nCurrent Depth: %d\nCurrent IOR: %f\nNext IOR: %f\nCurrent Normal: <%f, %f, %f>\nCurrent Position: <%f, %f, %f>\nCurrent Ray: (<%f, %f, %f>, <%f, %f, %f>)\nHit Instance: %d\n\n",curr_alpha,curr_depth,curr_ior,next_ior,curr_normal->x,curr_normal->y,curr_normal->z,curr_position->x,curr_position->y,curr_position->z,curr_ray->origin->x,curr_ray->origin->y,curr_ray->origin->z,curr_ray->direction->x,curr_ray->direction->y,curr_ray->direction->z,hit_instance!=NULL);
-                    }
-                    
                     if (refract_vector3(curr_ray->direction, curr_normal, curr_ior / next_ior, next_ray->direction)) {
                         total++;
                     }

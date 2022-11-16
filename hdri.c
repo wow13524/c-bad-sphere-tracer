@@ -51,7 +51,12 @@ Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
     unsigned int x = u * (self->size_x - 1);
     unsigned int y = v * (self->size_y - 1);
     
-    return col3_cpy(*(self->data + y * self->size_x + x), out);
+    unsigned int color = *(self->data + y * self->size_x + x);
+    float e = pow(2, (int)(color & 0xFF) - 136);
+    out->r = (color >> 24) * e;
+    out->g = ((color >> 16) & 255) * e;
+    out->b = ((color >> 8) & 255) * e;
+    return out;
 }
 
 Hdri* hdri(char *filename) {
@@ -92,31 +97,16 @@ Hdri* hdri(char *filename) {
         return NULL;
     }
 
-    x->data = malloc(sizeof(Color3 *) * x->size_x * x->size_y);
+    x->data = calloc(sizeof(unsigned int), x->size_x * x->size_y);
     assert(x->data);
-    for (unsigned int i = 0; i < x->size_y * x->size_x; i++) {
-        *(x->data + i) = color3(0, 0, 0);
-    }
 
     RleDecoder *decoder = rle_decoder(file);
 
     for (unsigned int i = 0; i < x->size_y; i++) {
         for (int j = 0; j < 4; j++) {
             for (unsigned int k = 0; k < x->size_x; k++) {
-                int c = rle_next_byte(decoder);
-                Color3 *color = *(x->data + i * x->size_x + k);
-                if (j == 0) {
-                    color->r = c;
-                }
-                else if (j == 1) {
-                    color->g = c;
-                }
-                else if (j == 2) {
-                    color->b = c;
-                }
-                else if (j == 3) {
-                    col3_smul(color, pow(2, c - 136), color);
-                }
+                *(x->data + i * x->size_x + k) <<= 8;
+                *(x->data + i * x->size_x + k) += rle_next_byte(decoder);
             }
         }
     }
@@ -128,3 +118,7 @@ Hdri* hdri(char *filename) {
 
     return x;
 }
+
+//174336
+//43260
+//cut memory down by 75%

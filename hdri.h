@@ -19,7 +19,7 @@ typedef struct RleDecoder {
 typedef struct Hdri {
     unsigned int size_x;
     unsigned int size_y;
-    Color3 **data;
+    unsigned int *data;
     Color3* (*sample)(struct Hdri *self, Vector3 *direction, Color3 *out);
 } Hdri;
 
