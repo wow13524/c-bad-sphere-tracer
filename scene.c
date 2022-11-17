@@ -156,6 +156,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static int *back_stack = NULL;
     static int *depth_stack = NULL;
     static float *ior_stack = NULL;
+    static Color3 **attenuation_stack = NULL;
     static SDFInstance **instance_stack = NULL;
     static Vector3 **normal_stack = NULL;
     static Vector3 **position_stack = NULL;
@@ -163,7 +164,6 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     static Color3 *temp_c = NULL;
     static SDFInstance *temp_i = NULL;
     static Vector3 *temp_v = NULL;
-    static Color3 *attenuation_color = NULL;
     static Color3 *light_color = NULL;
     static Vector3 *perturbed_position = NULL;
     if (!ior_stack) {   //Initialize static temp variables
@@ -172,16 +172,17 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
         assert((back_stack = malloc(sizeof(int) * stack_size)));
         assert((depth_stack = malloc(sizeof(int) * stack_size)));
         assert((ior_stack = malloc(sizeof(float) * stack_size)));
+        assert((attenuation_stack = malloc(sizeof(Color3 *) * stack_size)));
         assert((instance_stack = malloc(sizeof(SDFInstance *) * stack_size)));
         assert((normal_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
         assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
         temp_c = color3(0, 0, 0);
         temp_v = vector3(0, 0, 0);
-        attenuation_color = color3(0, 0, 0);
         light_color = color3(0, 0, 0);
         perturbed_position = vector3(0, 0, 0);
         for (int i = 0; i < stack_size; i++) {
+            *(attenuation_stack + i) = color3(0, 0, 0);
             *(normal_stack + i) = vector3(0, 0, 0);
             *(position_stack + i) = vector3(0, 0, 0);
             *(ray_stack + i) = ray(vector3(0, 0, 0), vector3(0, 0, 0));
@@ -194,9 +195,9 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_ATMOSPHERE_IOR;
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
-    attenuation_color->r = 1;
-    attenuation_color->g = 1;
-    attenuation_color->b = 1;
+    (*attenuation_stack)->r = 1;
+    (*attenuation_stack)->g = 1;
+    (*attenuation_stack)->b = 1;
     col3_smul(out, 0, out);
     int offset = 0;
     int total = 1;
@@ -206,6 +207,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
         int curr_back = *(back_stack + offset);
         int curr_depth = *(depth_stack + offset);
         float curr_ior = *(ior_stack + offset);
+        Color3 *curr_attenuation = *(attenuation_stack);
         Vector3 *curr_normal = *(normal_stack + offset);
         Vector3 *curr_position = *(position_stack + offset);
         Ray *curr_ray = *(ray_stack + offset);
@@ -235,14 +237,15 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             float diffuse_alpha = curr_alpha * (1 - reflectance) * (1 - hit_instance->material->transmission);
 
             if (is_inside_instance(self, curr_ray->origin, &next_instance)) {   //Beer's Law
-                col3_mul(attenuation_color, col3_exp(col3_smul(col3_log((*(instance_stack + curr_back))->material->color, temp_c), vec3_mag(vec3_sub(curr_position, *(position_stack + curr_back), temp_v)), temp_c), temp_c), attenuation_color);
+                col3_mul(curr_attenuation, col3_exp(col3_smul(col3_log((*(instance_stack + curr_back))->material->color, temp_c), vec3_mag(vec3_sub(curr_position, *(position_stack + curr_back), temp_v)), temp_c), temp_c), curr_attenuation);
             }
+
             if (diffuse_alpha > SCENE_ALPHA_MIN) {
                 get_light_color(self, curr_position, curr_normal, light_color);
                 if (hit_instance->material->checker) {
                     diffuse_alpha *= ((int)floor(curr_position->x / 2) % 2 + (int)floor(curr_position->y / 2) % 2 + (int)floor(curr_position->z / 2) % 2) % 2 ? 1 : .375;
                 }
-                col3_add(out, col3_smul(col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), attenuation_color, temp_c), diffuse_alpha, temp_c), out);
+                col3_add(out, col3_smul(col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), curr_attenuation, temp_c), diffuse_alpha, temp_c), out);
             }
 
             if (curr_depth < SCENE_RECURSION_DEPTH) {
@@ -253,6 +256,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                     *(back_stack + total) = offset;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = next_ior;
+                    col3_cpy(curr_attenuation, *(attenuation_stack + total));
                     if (refract_vector3(curr_ray->direction, curr_normal, curr_ior / next_ior, next_ray->direction)) {
                         total++;
                     }
@@ -264,14 +268,15 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                     *(back_stack + total) = offset;
                     *(depth_stack + total) = curr_depth + 1;
                     *(ior_stack + total) = curr_ior;
+                    col3_cpy(curr_attenuation, *(attenuation_stack + total));
                     perturb_vector3(curr_position, curr_normal, next_ray->origin);
                     reflect_vector3(curr_ray->direction, curr_normal, next_ray->direction);
                     total++;
                 }
             }
         }
-        else {
-            col3_add(out, col3_smul(col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), attenuation_color, temp_c), curr_alpha, temp_c), out);
+        else if (self->environment) {
+            col3_add(out, col3_smul(col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), curr_attenuation, temp_c), curr_alpha, temp_c), out);
         }
     } while (++offset < total);
 

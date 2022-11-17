@@ -42,7 +42,7 @@ int main(void) {
     sphere_a->material->reflectance = .1;
     sphere_a->material->transmission = 1;
 
-    SDFInstance *sphere_b = sdf_instance(cube);
+    SDFInstance *sphere_b = sdf_instance(sphere);
     sphere_b->instance->position = vector3(5, -.5, 8);
     sphere_b->instance->size = vector3(4, 4, 4);
     sphere_b->material->color = color3(.8, 1, .8);
@@ -50,7 +50,7 @@ int main(void) {
     sphere_b->material->reflectance = .1;
     sphere_b->material->transmission = 1;
 
-    SDFInstance *sphere_c = sdf_instance(cube);
+    SDFInstance *sphere_c = sdf_instance(sphere);
     sphere_c->instance->position = vector3(-2, 1, 2.5);
     sphere_c->instance->size = vector3(1, 1, 1);
     sphere_c->material->color = color3(.8, 0, .8);
@@ -58,7 +58,7 @@ int main(void) {
     sphere_c->material->reflectance = .1;
     sphere_c->material->transmission = 1;
 
-    SDFInstance *sphere_d = sdf_instance(cube);
+    SDFInstance *sphere_d = sdf_instance(sphere);
     sphere_d->instance->position = vector3(-3.75, 2.5, 12.5);
     sphere_d->instance->size = vector3(10, 10, 10);
     sphere_d->material->color = color3(.5, .8, .8);
@@ -73,8 +73,8 @@ int main(void) {
     s->add_instance(s, ground_plane);
     s->add_instance(s, sphere_a);
     s->add_instance(s, sphere_b);
-    //s->add_instance(s, sphere_c);
-    //s->add_instance(s, sphere_d);
+    s->add_instance(s, sphere_c);
+    s->add_instance(s, sphere_d);
     s->add_light(s, ambient);
     s->add_light(s, point_light_a);
     s->add_light(s, point_light_b);
