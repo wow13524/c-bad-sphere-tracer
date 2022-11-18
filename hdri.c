@@ -45,7 +45,7 @@ RleDecoder* rle_decoder(FILE *stream) {
 }
 
 Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
-    float u = fmod(atan2(direction->z, direction->x) / M_PI + .25 + 1, 1);
+    float u = fmod(atan2(direction->z, direction->x) / M_PI / 2 + .375 + 1, 1);
     float v = fmod(-asin(direction->y) / M_PI + .5 + 1, 1);
 
     unsigned int x = u * (self->size_x - 1);
@@ -118,7 +118,3 @@ Hdri* hdri(char *filename) {
 
     return x;
 }
-
-//174336
-//43260
-//cut memory down by 75%

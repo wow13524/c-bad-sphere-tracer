@@ -27,23 +27,23 @@ Color3* col3_cpy(Color3 *a, Color3 *out) {
 }
 
 Color3* col3_clamp(Color3 *a, Color3 *out) {
-    out->r = fmax(0, fmin(a->r, 1));
-    out->g = fmax(0, fmin(a->g, 1));
-    out->b = fmax(0, fmin(a->b, 1));
+    out->r = fmaxf(0, fmin(a->r, 1));
+    out->g = fmaxf(0, fmin(a->g, 1));
+    out->b = fmaxf(0, fmin(a->b, 1));
     return out;
 }
 
 Color3* col3_exp(Color3 *a, Color3 *out) {
-    out->r = exp(a->r);
-    out->g = exp(a->g);
-    out->b = exp(a->b);
+    out->r = expf(a->r);
+    out->g = expf(a->g);
+    out->b = expf(a->b);
     return out;
 }
 
 Color3* col3_log(Color3 *a, Color3 *out) {
-    out->r = log(a->r);
-    out->g = log(a->g);
-    out->b = log(a->b);
+    out->r = logf(a->r);
+    out->g = logf(a->g);
+    out->b = logf(a->b);
     return out;
 }
 
@@ -61,6 +61,20 @@ Color3* col3_mul(Color3 *a, Color3 *b, Color3 *out) {
     return out;
 }
 
+Color3* col3_div(Color3 *a, Color3 *b, Color3 *out) {
+    out->r = a->r / b->r;
+    out->g = a->g / b->g;
+    out->b = a->b / b->b;
+    return out;
+}
+
+Color3* col3_sadd(Color3 *a, float c, Color3 *out) {
+    out->r = a->r + c;
+    out->g = a->g + c;
+    out->b = a->b + c;
+    return out;
+}
+
 Color3* col3_smul(Color3 *a, float c, Color3 *out) {
     out->r = c * a->r;
     out->g = c * a->g;
@@ -72,6 +86,12 @@ Color3* col3_sdiv(Color3 *a, float c, Color3 *out) {
     out->r = a->r / c;
     out->g = a->g / c;
     out->b = a->b / c;
+    return out;
+}
+Color3* col3_spow(Color3 *a, float c, Color3 *out) {
+    out->r = powf(a->r, c);
+    out->g = powf(a->g, c);
+    out->b = powf(a->b, c);
     return out;
 }
 

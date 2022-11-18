@@ -20,7 +20,7 @@ float vec3_mag2(Vector3 *a) {
 }
 
 float vec3_mag(Vector3 *a) {
-    return sqrt(vec3_mag2(a));
+    return sqrtf(vec3_mag2(a));
 }
 
 float vec3_dot(Vector3 *a, Vector3 *b) {

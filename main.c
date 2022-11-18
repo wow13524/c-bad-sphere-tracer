@@ -42,7 +42,7 @@ int main(void) {
     sphere_a->material->reflectance = .1;
     sphere_a->material->transmission = 1;
 
-    SDFInstance *sphere_b = sdf_instance(sphere);
+    SDFInstance *sphere_b = sdf_instance(cube);
     sphere_b->instance->position = vector3(5, -.5, 8);
     sphere_b->instance->size = vector3(4, 4, 4);
     sphere_b->material->color = color3(.8, 1, .8);
@@ -50,7 +50,7 @@ int main(void) {
     sphere_b->material->reflectance = .1;
     sphere_b->material->transmission = 1;
 
-    SDFInstance *sphere_c = sdf_instance(sphere);
+    SDFInstance *sphere_c = sdf_instance(cube);
     sphere_c->instance->position = vector3(-2, 1, 2.5);
     sphere_c->instance->size = vector3(1, 1, 1);
     sphere_c->material->color = color3(.8, 0, .8);

@@ -52,7 +52,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     SDFInstance *result = NULL;
     SDFInstance *temp = NULL;
     int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
-    float omega = 1.75;
+    float omega = 1.75; //Over-relaxation factor [1, 2)
     float last_radius = 0;
     float total_distance = 0;
     float next_step = 0;
@@ -113,8 +113,8 @@ float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) 
 
 float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
     static Vector3 offset = (Vector3){};
-    float distance = instance->get_distance(instance, vec3_add(position, axis, &offset));
-    return distance - instance->get_distance(instance, vec3_sub(position, axis, &offset));
+    return instance->get_distance(instance, vec3_add(position, axis, &offset))
+         - instance->get_distance(instance, vec3_sub(position, axis, &offset));
 }
 
 Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
@@ -211,22 +211,21 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
         Vector3 *curr_normal = *(normal_stack + offset);
         Vector3 *curr_position = *(position_stack + offset);
         Ray *curr_ray = *(ray_stack + offset);
-        SDFInstance *hit_instance = ray_march(
+        SDFInstance *hit_instance =  (*(instance_stack + offset) = ray_march(
             self,
             curr_ray,
             SCENE_MARCH_DIST_MAX,
             curr_position
-        );
-        //TODO correct beers law by tracking attenuation color separately
+        ));
         if (hit_instance) {
             get_normal(hit_instance, curr_position, curr_normal);
-            *(instance_stack + offset) = hit_instance;
-            SDFInstance *next_instance = NULL;
-            int same_direction = vec3_dot(curr_ray->direction, curr_normal) > 0;
+            if (vec3_dot(curr_ray->direction, curr_normal) > 0) {
+                vec3_neg(curr_normal, curr_normal);
+            }
             float next_ior = SCENE_ATMOSPHERE_IOR;
-            perturb_vector3(curr_position, same_direction ? curr_normal : vec3_neg(curr_normal, temp_v), perturbed_position);
-            if (is_inside_instance(self, perturbed_position, &next_instance)) {
-                next_ior = next_instance->material->ior;
+            perturb_vector3(curr_position, vec3_neg(curr_normal, temp_v), perturbed_position);
+            if (is_inside_instance(self, perturbed_position, &temp_i)) {
+                next_ior = temp_i->material->ior;
             }
 
             float reflectance = hit_instance->material->reflectance;
@@ -236,7 +235,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             float transmission_alpha = curr_alpha * (1 - (reflectance + fresnel_add)) * hit_instance->material->transmission;
             float diffuse_alpha = curr_alpha * (1 - reflectance) * (1 - hit_instance->material->transmission);
 
-            if (is_inside_instance(self, curr_ray->origin, &next_instance)) {   //Beer's Law
+            if (is_inside_instance(self, curr_ray->origin, &temp_i)) {   //Beer's Law
                 col3_mul(curr_attenuation, col3_exp(col3_smul(col3_log((*(instance_stack + curr_back))->material->color, temp_c), vec3_mag(vec3_sub(curr_position, *(position_stack + curr_back), temp_v)), temp_c), temp_c), curr_attenuation);
             }
 
@@ -283,8 +282,8 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     return out;
 }
 
-Color3* tonemap(Color3 *c, Color3 *out) {
-    float l = 0.299 * c->r + 0.587 * c->g + 0.114 * c->b;
+Color3* tonemap(Color3 *a, Color3 *out) {
+    /*float l = 0.299 * c->r + 0.587 * c->g + 0.114 * c->b;
     float c_r = c->r / (1 + c->r);
     float c_g = c->g / (1 + c->g);
     float c_b = c->b / (1 + c->b);
@@ -292,7 +291,23 @@ Color3* tonemap(Color3 *c, Color3 *out) {
     out->r = out->r * (1 - c_r) + c_r * c_r;
     out->g = out->g * (1 - c_g) + c_g * c_g;
     out->b = out->b * (1 - c_b) + c_b * c_b;
-    return out;
+    return col3_spow(out, 1 / 2.2, out);*/
+    static Color3 temp_c1 = (Color3){};
+    static Color3 temp_c2 = (Color3){};
+
+    out->r = 0.59719 * a->r + 0.35458 * a->g + 0.04823 * a->b;
+    out->g = 0.07600 * a->r + 0.90834 * a->g + 0.01566 * a->b;
+    out->b = 0.02840 * a->r + 0.13383 * a->g + 0.83777 * a->b;
+
+    col3_sadd(col3_mul(out, col3_sadd(out, 0.0245786, &temp_c1), &temp_c1), -0.000090537, &temp_c1);
+    col3_sadd(col3_mul(out, col3_sadd(col3_smul(out, 0.983729, &temp_c2), 0.4329510, &temp_c2), &temp_c2), 0.238081, &temp_c2);
+    col3_div(&temp_c1, &temp_c2, &temp_c1);
+
+    out->r =  1.60475 * temp_c1.r - 0.53108 * temp_c1.g - 0.07367 * temp_c1.b;
+    out->g = -0.10208 * temp_c1.r + 1.10813 * temp_c1.g - 0.00605 * temp_c1.b;
+    out->b = -0.00327 * temp_c1.r - 0.07276 * temp_c1.g + 1.07602 * temp_c1.b;
+
+    return col3_spow(col3_clamp(out, out), 1 / 2.2, out);
 }
 
 unsigned int* render(Scene *self, Camera *camera) {
@@ -319,7 +334,7 @@ unsigned int* render(Scene *self, Camera *camera) {
                     col3_add(temp_cout, col3_smul(get_color_iterative(self, temp_r, temp_c), alpha, temp_c), temp_cout);
                 }
             }
-            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(col3_clamp(tonemap(temp_cout, temp_cout), temp_cout));
+            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
         }
     }
     fprintf(stderr, "%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);

@@ -27,3 +27,5 @@ Camera* perspective_camera(float fov_vertical, float aspect_ratio) {
     camera->size_y = -2 * tan(fov_vertical / 2);
     return camera;
 }
+
+//TODO add lens camera
