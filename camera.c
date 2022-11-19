@@ -23,8 +23,8 @@ Ray* get_ray(Camera *self, float u, float v, Ray *out) {
 Camera* perspective_camera(float fov_vertical, float aspect_ratio) {
     Camera* camera = abstract_camera();
     camera->get_ray = get_ray;
-    camera->size_x = 2 * tan(fov_vertical / 2) * aspect_ratio;
-    camera->size_y = -2 * tan(fov_vertical / 2);
+    camera->size_x = 2 * tanf(fov_vertical / 2) * aspect_ratio;
+    camera->size_y = -2 * tanf(fov_vertical / 2);
     return camera;
 }
 

@@ -58,7 +58,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     float next_step = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
         float radius = direction * map(self, vec3_add(r->origin, vec3_mul(r->direction, total_distance, &temp_v), out), &result);
-        float abs_radius = fabs(radius);
+        float abs_radius = fabsf(radius);
         if (omega != 1 && omega * last_radius > last_radius + abs_radius) {
             next_step -= omega * next_step;
             omega = 1;
@@ -96,15 +96,15 @@ Vector3* refract_vector3(Vector3 *direction, Vector3 *normal, float r, Vector3 *
         return NULL;
     } 
     else if(c > 0) {    //Correct for when ray is leaving an object
-        return vec3_sub(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * c - sqrt(s), out), out);
+        return vec3_sub(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * c - sqrtf(s), out), out);
     }
     else {
-        return vec3_add(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * -c - sqrt(s), out), out);
+        return vec3_add(vec3_mul(direction, r, &temp_v), vec3_mul(normal, r * -c - sqrtf(s), out), out);
     }
 }
 
 float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) {
-    float c = 1 - fabs(vec3_dot(direction, normal));
+    float c = 1 - fabsf(vec3_dot(direction, normal));
     float r = (ior_in - ior_out) / (ior_in + ior_out);
     r *= r;
     return r + (1 - r) * c * c * c * c * c;
@@ -242,7 +242,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             if (diffuse_alpha > SCENE_ALPHA_MIN) {
                 get_light_color(self, curr_position, curr_normal, light_color);
                 if (hit_instance->material->checker) {
-                    diffuse_alpha *= ((int)floor(curr_position->x / 2) % 2 + (int)floor(curr_position->y / 2) % 2 + (int)floor(curr_position->z / 2) % 2) % 2 ? 1 : .375;
+                    diffuse_alpha *= ((int)floorf(curr_position->x / 2) % 2 + (int)floorf(curr_position->y / 2) % 2 + (int)floorf(curr_position->z / 2) % 2) % 2 ? 1 : .375;
                 }
                 col3_add(out, col3_smul(col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), curr_attenuation, temp_c), diffuse_alpha, temp_c), out);
             }

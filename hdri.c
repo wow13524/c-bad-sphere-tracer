@@ -45,14 +45,14 @@ RleDecoder* rle_decoder(FILE *stream) {
 }
 
 Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
-    float u = fmod(atan2(direction->z, direction->x) / M_PI / 2 + .375 + 1, 1);
-    float v = fmod(-asin(direction->y) / M_PI + .5 + 1, 1);
+    float u = fmod(atan2f(direction->z, direction->x) / M_PI / 2 + .375 + 1, 1);
+    float v = fmod(-asinf(direction->y) / M_PI + .5 + 1, 1);
 
     unsigned int x = u * (self->size_x - 1);
     unsigned int y = v * (self->size_y - 1);
     
     unsigned int color = *(self->data + y * self->size_x + x);
-    float e = pow(2, (int)(color & 0xFF) - 136);
+    float e = powf(2, (int)(color & 0xFF) - 136);
     out->r = (color >> 24) * e;
     out->g = ((color >> 16) & 255) * e;
     out->b = ((color >> 8) & 255) * e;

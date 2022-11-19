@@ -13,12 +13,12 @@ SDFInstance* sdf_instance(distance_function_t distance_function) {
 }
 
 float distance_cube(SDFInstance *self, Vector3 *position) {
-    return fmax(
-        fmax(
-            fabs(self->instance->position->x - position->x) - self->instance->size->x / 2,
-            fabs(self->instance->position->y - position->y) - self->instance->size-> y / 2
+    return fmaxf(
+        fmaxf(
+            fabsf(self->instance->position->x - position->x) - self->instance->size->x / 2,
+            fabsf(self->instance->position->y - position->y) - self->instance->size-> y / 2
         ),
-        fabs(self->instance->position->z - position->z) - self->instance->size->z / 2
+        fabsf(self->instance->position->z - position->z) - self->instance->size->z / 2
     );
 }
 

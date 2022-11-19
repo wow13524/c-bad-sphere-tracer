@@ -27,6 +27,10 @@ $(PROG):	$(OBJ)
 clean:
 	rm -f $(OBJ) $(PROG)
 
+timepng:
+	make
+	bash time make png
+
 png:
 	make
 	./draw | ./pnmtopng > output.png

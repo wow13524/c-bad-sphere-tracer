@@ -27,9 +27,9 @@ Color3* col3_cpy(Color3 *a, Color3 *out) {
 }
 
 Color3* col3_clamp(Color3 *a, Color3 *out) {
-    out->r = fmaxf(0, fmin(a->r, 1));
-    out->g = fmaxf(0, fmin(a->g, 1));
-    out->b = fmaxf(0, fmin(a->b, 1));
+    out->r = fmaxf(0, fminf(a->r, 1));
+    out->g = fmaxf(0, fminf(a->g, 1));
+    out->b = fmaxf(0, fminf(a->b, 1));
     return out;
 }
 
