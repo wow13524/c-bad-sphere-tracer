@@ -16,7 +16,7 @@ Vector3* vector3(float x, float y, float z) {
 }
 
 float vec3_mag2(Vector3 *a) {
-    return a->x * a->x + a->y * a->y + a->z * a->z;
+    return vec3_dot(a, a);
 }
 
 float vec3_mag(Vector3 *a) {
@@ -28,16 +28,20 @@ float vec3_dot(Vector3 *a, Vector3 *b) {
 }
 
 Vector3* vec3_cpy(Vector3 *a, Vector3 *out) {
-    out->x = a->x;
-    out->y = a->y;
-    out->z = a->z;
+    vst1q_f32(
+        (float32_t *)out,
+        vld1q_f32((float32_t *)a)
+    );
     return out;
 }
 
 Vector3 *vec3_neg(Vector3 *a, Vector3 *out){
-    out->x = -a->x;
-    out->y = -a->y;
-    out->z = -a->z;
+    vst1q_f32(
+        (float32_t *)out,
+        vnegq_f32(
+            vld1q_f32((float32_t *)a)
+        )
+    );
     return out;
 }
 
@@ -46,23 +50,35 @@ Vector3* vec3_unit(Vector3 *a, Vector3 *out) {
 }
 
 Vector3* vec3_add(Vector3 *a, Vector3 *b, Vector3 *out) {
-    out->x = a->x + b->x;
-    out->y = a->y + b->y;
-    out->z = a->z + b->z;
+    vst1q_f32(
+        (float32_t *)out,
+        vaddq_f32(
+            vld1q_f32((float32_t *)a),
+            vld1q_f32((float32_t *)b)
+        )
+    );
     return out;
 }
 
 Vector3* vec3_sub(Vector3 *a, Vector3 *b, Vector3 *out) {
-    out->x = a->x - b->x;
-    out->y = a->y - b->y;
-    out->z = a->z - b->z;
+    vst1q_f32(
+        (float32_t *)out,
+        vsubq_f32(
+            vld1q_f32((float32_t *)a),
+            vld1q_f32((float32_t *)b)
+        )
+    );
     return out;
 }
 
 Vector3* vec3_mul(Vector3 *a, float c, Vector3 *out) {
-    out->x = c * a->x;
-    out->y = c * a->y;
-    out->z = c * a->z;
+    vst1q_f32(
+        (float32_t *)out,
+        vmulq_n_f32(
+            vld1q_f32((float32_t *)a),
+            c
+        )
+    );
     return out;
 }
 

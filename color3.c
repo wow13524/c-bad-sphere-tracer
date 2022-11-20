@@ -20,9 +20,10 @@ unsigned int col3_to_int(Color3 *a) {
 }
 
 Color3* col3_cpy(Color3 *a, Color3 *out) {
-    out->r = a->r;
-    out->g = a->g;
-    out->b = a->b;
+    vst1q_f32(
+        (float32_t *)out,
+        *((float32x4_t *)a)
+    );
     return out;
 }
 
@@ -48,27 +49,39 @@ Color3* col3_log(Color3 *a, Color3 *out) {
 }
 
 Color3* col3_add(Color3 *a, Color3 *b, Color3 *out) {
-    out->r = a->r + b->r;
-    out->g = a->g + b->g;
-    out->b = a->b + b->b;
+    vst1q_f32(
+        (float32_t *)out,
+        vaddq_f32(
+            vld1q_f32((float32_t *)a),
+            vld1q_f32((float32_t *)b)
+        )
+    );
     return out;
 }
 
 Color3* col3_mul(Color3 *a, Color3 *b, Color3 *out) {
-    out->r = a->r * b->r;
-    out->g = a->g * b->g;
-    out->b = a->b * b->b;
+    vst1q_f32(
+        (float32_t *)out,
+        vmulq_f32(
+            vld1q_f32((float32_t *)a),
+            vld1q_f32((float32_t *)b)
+        )
+    );
     return out;
 }
 
 Color3* col3_div(Color3 *a, Color3 *b, Color3 *out) {
-    out->r = a->r / b->r;
-    out->g = a->g / b->g;
-    out->b = a->b / b->b;
+    vst1q_f32(
+        (float32_t *)out,
+        vmulq_f32(
+            vld1q_f32((float32_t *)a),
+            vrecpeq_f32(vld1q_f32((float32_t *)b))
+        )
+    );
     return out;
 }
 
-Color3* col3_sadd(Color3 *a, float c, Color3 *out) {
+Color3* col3_sadd(Color3 *a, float c, Color3 *out) {    //vaddq_n_f32 not defined :(
     out->r = a->r + c;
     out->g = a->g + c;
     out->b = a->b + c;
@@ -76,17 +89,18 @@ Color3* col3_sadd(Color3 *a, float c, Color3 *out) {
 }
 
 Color3* col3_smul(Color3 *a, float c, Color3 *out) {
-    out->r = c * a->r;
-    out->g = c * a->g;
-    out->b = c * a->b;
+    vst1q_f32(
+        (float32_t *)out,
+        vmulq_n_f32(
+            vld1q_f32((float32_t *)a),
+            c
+        )
+    );
     return out;
 }
 
 Color3* col3_sdiv(Color3 *a, float c, Color3 *out) {
-    out->r = a->r / c;
-    out->g = a->g / c;
-    out->b = a->b / c;
-    return out;
+    return col3_smul(a, 1 / c, out);
 }
 Color3* col3_spow(Color3 *a, float c, Color3 *out) {
     out->r = powf(a->r, c);
@@ -96,8 +110,17 @@ Color3* col3_spow(Color3 *a, float c, Color3 *out) {
 }
 
 Color3* col3_lerp(Color3 *a, Color3 *b, float c, Color3 *out) {
-    out->r = a->r + c * (b->r - a->r);
-    out->g = a->g + c * (b->g - a->g);
-    out->b = a->b + c * (b->b - a->b);
+    float32x4_t fa = vld1q_f32((float32_t *)a);
+    float32x4_t fb = vld1q_f32((float32_t *)b);
+    vst1q_f32(
+        (float32_t *)out,
+        vaddq_f32(
+            fa,
+            vmulq_n_f32(
+                vsubq_f32(fb, fa),
+                c
+            )
+        )
+    );
     return out;
 }

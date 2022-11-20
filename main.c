@@ -7,6 +7,8 @@
 #include "render_output.h"
 #include "scene.h"
 
+#include <arm_neon.h>
+
 int main(void) {
     Hdri *environment = hdri("clarens_night_02_4k.hdr");
 

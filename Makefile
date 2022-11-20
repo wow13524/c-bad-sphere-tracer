@@ -16,20 +16,20 @@ DEBUG	= -ggdb
 CSTD	=
 WARN	= -Wall -Wextra -Werror
 CDEFS	=
-CFLAGS	= -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
+CFLAGS	= -O3 -mfloat-abi=hard -mfpu=neon -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
 
 $(OBJ):	$(HEAD)
 
 # specify how to compile the target
 $(PROG):	$(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) $(LIB) -lm -o $@ -O3
+	$(CC) $(CFLAGS) $(OBJ) $(LIB) -lm -o $@
 
 clean:
 	rm -f $(OBJ) $(PROG)
 
 timepng:
 	make
-	bash time make png
+	bash -c 'time make png'
 
 png:
 	make

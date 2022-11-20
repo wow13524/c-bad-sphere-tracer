@@ -1,12 +1,15 @@
+#include <arm_neon.h>
+
 #ifndef COLOR3_H
 #define COLOR3_H
 
 int colors;
 
 typedef struct Color3 {
-    float r;
-    float g;
-    float b;
+    float32_t r;
+    float32_t g;
+    float32_t b;
+    float32_t _;
 } Color3;
 
 Color3* color3(float r, float g, float b);

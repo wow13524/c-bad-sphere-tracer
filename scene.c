@@ -118,9 +118,9 @@ float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis)
 }
 
 Vector3* get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
-    static Vector3 dx = (Vector3){EPSILON, 0, 0};
-    static Vector3 dy = (Vector3){0, EPSILON, 0};
-    static Vector3 dz = (Vector3){0, 0, EPSILON};
+    static Vector3 dx = (Vector3){EPSILON, 0, 0, 0};
+    static Vector3 dy = (Vector3){0, EPSILON, 0, 0};
+    static Vector3 dz = (Vector3){0, 0, EPSILON, 0};
     out->x = get_distance_axis(instance, position, &dx);
     out->y = get_distance_axis(instance, position, &dy);
     out->z = get_distance_axis(instance, position, &dz);

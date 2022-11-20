@@ -1,12 +1,15 @@
+#include <arm_neon.h>
+
 #ifndef VECTOR3_H
 #define VECTOR3_H
 
 int vectors;
 
 typedef struct Vector3 {
-    float x;
-    float y;
-    float z;
+    float32_t x;
+    float32_t y;
+    float32_t z;
+    float32_t _;
 } Vector3;
 
 Vector3* vector3(float x, float y, float z);
