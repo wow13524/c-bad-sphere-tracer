@@ -9,10 +9,11 @@
 
 typedef struct RleDecoder {
     FILE *stream;
+    char *buf;
     unsigned int mode:1;
     unsigned int ctr:8;
     unsigned int ctr_row;
-    unsigned int last:8;
+    char last;
 
 } RleDecoder;
 

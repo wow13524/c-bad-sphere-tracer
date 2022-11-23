@@ -7,36 +7,44 @@
 
 //Implements a generator to decode run length encoding of .hdr files
 int rle_next_byte(RleDecoder *self) {
-    if (!self->ctr_row) {
-        fseek(self->stream, 2, SEEK_CUR);
-        self->ctr_row = 4 * ((fgetc(self->stream) << 8) + fgetc(self->stream));
-    }
-    self->ctr_row--;
-    if (!self->ctr) {
-        int count = fgetc(self->stream);
-        if (count > 128) {
-            self->mode = 1;
-            self->ctr = count - 128;
-            self->last = fgetc(self->stream);
-        }
-        else {
-            self->mode = 0;
-            self->ctr = count;
-        }
-    }
-    self->ctr--;
-    if (self->mode) {
-        return self->last;
-    }
-    else {
-        return fgetc(self->stream);
+
+    switch (self->ctr_row--) {
+        case 0:
+            fseek(self->stream, 2, SEEK_CUR);
+            self->ctr_row = 4 * ((fgetc(self->stream) << 8) + fgetc(self->stream)) - 1;
+            //FALL THROUGH
+        default:
+            if (!self->ctr) {
+                int count = fgetc(self->stream);
+                if (count > 128) {
+                    self->mode = 1;
+                    self->ctr = count - 128;
+                    self->last = fgetc(self->stream);
+                }
+                else {
+                    self->mode = 0;
+                    self->ctr = count;
+                    fread(self->buf, count, 1, self->stream);
+                    self->last = 0;
+                }
+            }
+            self->ctr--;
+            switch (self->mode) {
+                case 0:
+                    return *(self->buf + self->last++);
+                case 1:
+                return self->last;
+            }
     }
 }
 
 RleDecoder* rle_decoder(FILE *stream) {
     RleDecoder *x = malloc(sizeof(RleDecoder));
     assert(x);
+    char *buf = malloc(sizeof(char) * READ_BUF_SIZE);
+    assert(buf);
     x->stream = stream;
+    x->buf = buf;
     x->mode = 0;
     x->ctr = 0;
     x->ctr_row = 0;
@@ -53,10 +61,10 @@ Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
     
     unsigned int color = *(self->data + y * self->size_x + x);
     float e = powf(2, (int)(color & 0xFF) - 136);
-    out->r = (color >> 24) * e;
-    out->g = ((color >> 16) & 255) * e;
-    out->b = ((color >> 8) & 255) * e;
-    return out;
+    out->r = (color >> 24);
+    out->g = ((color >> 16) & 0xFF);
+    out->b = ((color >> 8) & 0xFF);
+    return col3_smul(out, e, out);
 }
 
 Hdri* hdri(char *filename) {

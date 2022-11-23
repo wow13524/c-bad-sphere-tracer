@@ -12,17 +12,17 @@ LIB     =
 # select the compiler and flags
 # you can over-ride these on the command line e.g. make DEBUG= 
 CC      = gcc
-DEBUG	= -ggdb
+DEBUG	=
 CSTD	=
 WARN	= -Wall -Wextra -Werror
 CDEFS	=
-CFLAGS	= -O3 -mfloat-abi=hard -mfpu=neon -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
+CFLAGS	= -O3 -lm -mfloat-abi=hard -mfpu=neon -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
 
 $(OBJ):	$(HEAD)
 
 # specify how to compile the target
 $(PROG):	$(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) $(LIB) -lm -o $@
+	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@
 
 clean:
 	rm -f $(OBJ) $(PROG)
