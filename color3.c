@@ -31,6 +31,10 @@ Color3* col3_clamp(Color3 *a, Color3 *out) {
     out->r = fmaxf(0, fminf(a->r, 1));
     out->g = fmaxf(0, fminf(a->g, 1));
     out->b = fmaxf(0, fminf(a->b, 1));
+    vst1q_f32(  //WHY DOESNT THIS WORK
+        (float32_t *)out,
+        *((float32x4_t *)a)
+    );
     return out;
 }
 
