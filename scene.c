@@ -191,7 +191,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
 
     *alpha_stack = 1;
     *back_stack = -1;
-    *depth_stack = 0;
+    *depth_stack = 1;
     *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_ATMOSPHERE_IOR;
     vec3_cpy(r->origin, (*ray_stack)->origin);
     vec3_cpy(r->direction, (*ray_stack)->direction);
