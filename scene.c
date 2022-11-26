@@ -283,15 +283,6 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
 }
 
 Color3* tonemap(Color3 *a, Color3 *out) {
-    /*float l = 0.299 * c->r + 0.587 * c->g + 0.114 * c->b;
-    float c_r = c->r / (1 + c->r);
-    float c_g = c->g / (1 + c->g);
-    float c_b = c->b / (1 + c->b);
-    col3_sdiv(c, 1 + l, out);
-    out->r = out->r * (1 - c_r) + c_r * c_r;
-    out->g = out->g * (1 - c_g) + c_g * c_g;
-    out->b = out->b * (1 - c_b) + c_b * c_b;
-    return col3_spow(out, 1 / 2.2, out);*/
     static Color3 temp_c1 = (Color3){};
     static Color3 temp_c2 = (Color3){};
 
