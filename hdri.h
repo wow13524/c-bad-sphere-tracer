@@ -5,11 +5,12 @@
 #ifndef HDRI_H
 #define HDRI_H
 
-#define READ_BUF_SIZE 129
+#define READ_BUF_SIZE 65536
 
 typedef struct RleDecoder {
     FILE *stream;
     char *buf;
+    unsigned int bufpos;
     unsigned int mode:1;
     unsigned int ctr:8;
     unsigned int ctr_row;

@@ -5,36 +5,38 @@
 #include <string.h>
 #include "hdri.h"
 
-//Implements a generator to decode run length encoding of .hdr files
-int rle_next_byte(RleDecoder *self) {
+static inline int rle_next_byte_raw(RleDecoder *self, unsigned int offset) {
+    self->bufpos += offset;
+    while (self->bufpos >= READ_BUF_SIZE) {
+        fread(self->buf, READ_BUF_SIZE, 1, self->stream);
+        self->bufpos -= READ_BUF_SIZE;
+    }
+    return *(self->buf + self->bufpos++);
+}
 
-    switch (self->ctr_row--) {
+//Implements a generator to decode run length encoding of .hdr files
+static inline int rle_next_byte(RleDecoder *self) {
+    if (!self->ctr_row--) {
+        self->ctr_row = 4 * ((rle_next_byte_raw(self, 2) << 8) + rle_next_byte_raw(self, 0)) - 1;
+    }
+    if (!self->ctr) {
+        int count = rle_next_byte_raw(self, 0);
+        if (count > 128) {
+            self->mode = 1;
+            self->ctr = count - 128;
+            self->last = rle_next_byte_raw(self, 0);
+        }
+        else {
+            self->mode = 0;
+            self->ctr = count;
+        }
+    }
+    self->ctr--;
+    switch (self->mode) {
         case 0:
-            fseek(self->stream, 2, SEEK_CUR);
-            self->ctr_row = 4 * ((fgetc(self->stream) << 8) + fgetc(self->stream)) - 1;
-            //FALL THROUGH
-        default:
-            if (!self->ctr) {
-                int count = fgetc(self->stream);
-                if (count > 128) {
-                    self->mode = 1;
-                    self->ctr = count - 128;
-                    self->last = fgetc(self->stream);
-                }
-                else {
-                    self->mode = 0;
-                    self->ctr = count;
-                    fread(self->buf, count, 1, self->stream);
-                    self->last = 0;
-                }
-            }
-            self->ctr--;
-            switch (self->mode) {
-                case 0:
-                    return *(self->buf + self->last++);
-                case 1:
-                return self->last;
-            }
+            return rle_next_byte_raw(self, 0);
+        case 1:
+        return self->last;
     }
 }
 
@@ -45,6 +47,7 @@ RleDecoder* rle_decoder(FILE *stream) {
     assert(buf);
     x->stream = stream;
     x->buf = buf;
+    x->bufpos = READ_BUF_SIZE;
     x->mode = 0;
     x->ctr = 0;
     x->ctr_row = 0;
