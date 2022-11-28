@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
@@ -28,12 +29,17 @@ Color3* col3_cpy(Color3 *a, Color3 *out) {
 }
 
 Color3* col3_clamp(Color3 *a, Color3 *out) {
-    out->r = fmaxf(0, fminf(a->r, 1));
-    out->g = fmaxf(0, fminf(a->g, 1));
-    out->b = fmaxf(0, fminf(a->b, 1));
-    vst1q_f32(  //WHY DOESNT THIS WORK
+    static float32x4_t zero = (float32x4_t){0,0,0,0};
+    static float32x4_t one = (float32x4_t){1,1,1,1};
+    vst1q_f32(
         (float32_t *)out,
-        *((float32x4_t *)a)
+        vmaxq_f32(
+            zero,
+            vminq_f32(
+                *((float32x4_t *)a),
+                one
+            )
+        )
     );
     return out;
 }

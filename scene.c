@@ -298,7 +298,9 @@ Color3* tonemap(Color3 *a, Color3 *out) {
     out->g = -0.10208 * temp_c1.r + 1.10813 * temp_c1.g - 0.00605 * temp_c1.b;
     out->b = -0.00327 * temp_c1.r - 0.07276 * temp_c1.g + 1.07602 * temp_c1.b;
 
-    return col3_spow(col3_clamp(out, out), 1 / 2.2, out);
+    col3_clamp(out, out);
+    col3_spow(out, 1 / 2.2, out);
+    return out;
 }
 
 unsigned int* render(Scene *self, Camera *camera) {
@@ -322,7 +324,9 @@ unsigned int* render(Scene *self, Camera *camera) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    col3_add(temp_cout, col3_smul(get_color_iterative(self, temp_r, temp_c), alpha, temp_c), temp_cout);
+                    get_color_iterative(self, temp_r, temp_c);
+                    col3_smul(temp_c, alpha, temp_c);
+                    col3_add(temp_cout, temp_c, temp_cout);
                 }
             }
             *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
