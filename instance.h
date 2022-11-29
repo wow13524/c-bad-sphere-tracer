@@ -1,3 +1,4 @@
+#include <arm_neon.h>
 #include "color3.h"
 #include "vector3.h"
 
@@ -7,6 +8,9 @@
 typedef struct Instance {
     Vector3 *position;
     Vector3 *size;
+
+    float32x4_t _position;
+    float32x4_t _size;
 } Instance;
 
 Instance* instance();
