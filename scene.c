@@ -312,6 +312,15 @@ unsigned int* render(Scene *self, Camera *camera) {
     Vector3 *temp_v2 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
     float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
+
+    //Cache position and size as neon types
+    for (int i = 0; i < self->instance_count; i++) {
+        refresh_instance((*(self->instances + i))->instance);
+    }
+    for (int i = 0; i < self->light_count; i++) {
+        refresh_instance((*(self->lights + i))->instance);
+    }
+
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;

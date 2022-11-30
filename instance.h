@@ -14,5 +14,6 @@ typedef struct Instance {
 } Instance;
 
 Instance* instance();
+void refresh_instance(Instance *x);
 
 #endif
