@@ -10,6 +10,10 @@ This is a project I've been working on since I started learning C in order to ha
 - HDRI support
 - Raytraced shadows (treats all objects as opaque)
 
+## Quickstart
+
+Clone the repository and run `make png` to render the scene to `output.png`.
+
 ## Example Renders
 This was rendered with an incorrect implementation of refraction.
 ![Broken Refraction](example_outputs/output_hd.png)
