@@ -3,6 +3,9 @@
 This is a project I've been working on since I started learning C in order to have a better grasp on the language.  This code implements a rudimentary sphere tracer written in pure C with the goal of being able to render images within a reasonable amount of time on a Raspberry Pi 4 Revision 4.  Some example renders are included below.
 
 ## Implemented Features
+- Render to terminal (full color)
+- Render to .ppm
+- Render to .png (depends on [Netpbm's `pnmtopng`](https://netpbm.sourceforge.net/), included in this repository precompiled for RPi4)
 - Solid diffuse color
 - Reflection
 - Refraction
