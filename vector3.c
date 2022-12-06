@@ -28,19 +28,34 @@ float vec3_dot(Vector3 *a, Vector3 *b) {
 }
 
 Vector3* vec3_cpy(Vector3 *a, Vector3 *out) {
-    vst1q_f32(
+    /*vst1q_f32(
         (float32_t *)out,
         vld1q_f32((float32_t *)a)
+    );*/
+    asm volatile (
+    "vld1.f32  {q0}, [%0]       \n\t"
+    "vst1.f32  {q0}, [%1]       \n\t"
+    :
+    : "r"(a), "r"(out)
+    : "q0", "memory"
     );
     return out;
 }
 
 Vector3 *vec3_neg(Vector3 *a, Vector3 *out){
-    vst1q_f32(
+    /*vst1q_f32(
         (float32_t *)out,
         vnegq_f32(
             vld1q_f32((float32_t *)a)
         )
+    );*/
+    asm volatile (
+    "vld1.f32  {q0}, [%0]       \n\t"
+    "vneg.f32   q0,   q0        \n\t"
+    "vst1.f32  {q0}, [%1]       \n\t"
+    :
+    : "r"(a), "r"(out)
+    : "q0", "memory"
     );
     return out;
 }
@@ -50,23 +65,41 @@ Vector3* vec3_unit(Vector3 *a, Vector3 *out) {
 }
 
 Vector3* vec3_add(Vector3 *a, Vector3 *b, Vector3 *out) {
-    vst1q_f32(
+    /*vst1q_f32(
         (float32_t *)out,
         vaddq_f32(
             vld1q_f32((float32_t *)a),
             vld1q_f32((float32_t *)b)
         )
+    );*/
+    asm volatile (
+    "vld1.f32  {q0}, [%0]       \n\t"
+    "vld1.f32  {q1}, [%1]       \n\t"
+    "vadd.f32   q0,   q0,   q1  \n\t"
+    "vst1.f32  {q0}, [%2]       \n\t"
+    :
+    : "r"(a), "r"(b), "r"(out)
+    : "q0", "q1", "memory"
     );
     return out;
 }
 
 Vector3* vec3_sub(Vector3 *a, Vector3 *b, Vector3 *out) {
-    vst1q_f32(
+    /*vst1q_f32(
         (float32_t *)out,
         vsubq_f32(
             vld1q_f32((float32_t *)a),
             vld1q_f32((float32_t *)b)
         )
+    );*/
+    asm volatile (
+    "vld1.f32  {q0}, [%0]       \n\t"
+    "vld1.f32  {q1}, [%1]       \n\t"
+    "vsub.f32   q0,   q0,   q1  \n\t"
+    "vst1.f32  {q0}, [%2]       \n\t"
+    :
+    : "r"(a), "r"(b), "r"(out)
+    : "q0", "q1", "memory"
     );
     return out;
 }
