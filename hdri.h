@@ -11,8 +11,8 @@ typedef struct RleDecoder {
     FILE *stream;
     char *buf;
     unsigned int bufpos;
-    unsigned int mode:1;
-    unsigned int ctr:8;
+    char mode;
+    char ctr;
     unsigned int ctr_row;
     char last;
 
@@ -21,7 +21,10 @@ typedef struct RleDecoder {
 typedef struct Hdri {
     unsigned int size_x;
     unsigned int size_y;
-    unsigned int *data;
+    char *data_r;
+    char *data_g;
+    char *data_b;
+    char *data_e;
     Color3* (*sample)(struct Hdri *self, Vector3 *direction, Color3 *out);
 } Hdri;
 

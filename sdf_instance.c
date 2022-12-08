@@ -13,14 +13,14 @@ SDFInstance* sdf_instance(distance_function_t distance_function) {
     return x;
 }
 
-float distance_cube(SDFInstance *self, Vector3 *position) {
+float distance_cube(SDFInstance *self, float32x4_t position) {
     float32x4_t dst = vsubq_f32(
         vabsq_f32(vsubq_f32(
-            vld1q_f32((float32_t *)self->instance->position),
-            vld1q_f32((float32_t *)position)
+            self->instance->_position,
+            position
         )),
         vmulq_n_f32(
-            vld1q_f32((float32_t *)self->instance->size),
+            self->instance->_size,
             .5
         )
     );
@@ -28,13 +28,18 @@ float distance_cube(SDFInstance *self, Vector3 *position) {
     return fmaxf(fmaxf(off->x, off->y), off->z);
 }
 
-float distance_plane(SDFInstance *self, Vector3 *position) {
-    return position->y - self->instance->position->y;
+float distance_plane(SDFInstance *self, float32x4_t position) {
+    return vgetq_lane_f32(position, 1) - vgetq_lane_f32(self->instance->_position, 1);
 }
 
-float distance_sphere(SDFInstance *self, Vector3 *position) {
-    static Vector3 temp = (Vector3){};
-    return vec3_mag(vec3_sub(self->instance->position, position, &temp)) - self->instance->size->x / 2;
+float distance_sphere(SDFInstance *self, float32x4_t position) {
+    float32x4_t vdst = vsubq_f32(self->instance->_position, position);
+    vdst = vmulq_f32(vdst, vdst);
+    return sqrtf(
+          vgetq_lane_f32(vdst, 0)
+        + vgetq_lane_f32(vdst, 1)
+        + vgetq_lane_f32(vdst, 2)
+    ) - vgetq_lane_f32(self->instance->_size, 0) / 2;
 }
 
 distance_function_t cube = distance_cube;

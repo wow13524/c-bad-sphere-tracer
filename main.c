@@ -9,6 +9,7 @@
 
 int main(void) {
     Hdri *environment = hdri("clarens_night_02_4k.hdr");
+    //return EXIT_SUCCESS;
 
     Light *ambient = light(ambient_light, ALWAYS_VISIBLE);
     ambient->instance->size = vector3(.375, 0, 0);

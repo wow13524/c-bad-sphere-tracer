@@ -15,29 +15,29 @@ static inline int rle_next_byte_raw(RleDecoder *self, unsigned int offset) {
 }
 
 //Implements a generator to decode run length encoding of .hdr files
-static inline int rle_next_byte(RleDecoder *self) {
-    if (!self->ctr_row--) {
-        self->ctr_row = 4 * ((rle_next_byte_raw(self, 2) << 8) + rle_next_byte_raw(self, 0)) - 1;
+static inline void rle_read_next(RleDecoder *self, char *out, int count) {
+    register unsigned int ctr_row = self->ctr_row;
+    register char ctr = self->ctr;
+    register char mode = self->mode;
+    register char last = self->last;
+    if (!ctr_row) {
+        ctr_row = 4 * ((rle_next_byte_raw(self, 2) << 8) + rle_next_byte_raw(self, 0));
     }
-    if (!self->ctr) {
-        int count = rle_next_byte_raw(self, 0);
-        if (count > 128) {
-            self->mode = 1;
-            self->ctr = count - 128;
-            self->last = rle_next_byte_raw(self, 0);
+    ctr_row -= count;
+    for (int i = 0; i < count; i++) {
+       if (!ctr) {
+            ctr = rle_next_byte_raw(self, 0);
+            mode = ctr > 128;
+            last = mode ? rle_next_byte_raw(self, 0) : 0;
+            ctr = ctr % 129 + mode;     //0-128 preserved, 129-255 -> 1->127
         }
-        else {
-            self->mode = 0;
-            self->ctr = count;
-        }
+        ctr--;
+        *(out++) = mode ? last : rle_next_byte_raw(self, 0);
     }
-    self->ctr--;
-    switch (self->mode) {
-        case 0:
-            return rle_next_byte_raw(self, 0);
-        case 1:
-        return self->last;
-    }
+    self->ctr_row = ctr_row;
+    self->ctr = ctr;
+    self->mode = mode;
+    self->last = last;
 }
 
 RleDecoder* rle_decoder(FILE *stream) {
@@ -62,11 +62,11 @@ Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
     unsigned int x = u * (self->size_x - 1);
     unsigned int y = v * (self->size_y - 1);
     
-    unsigned int color = *(self->data + y * self->size_x + x);
-    float e = powf(2, (int)(color & 0xFF) - 136);
-    out->r = (color >> 24);
-    out->g = ((color >> 16) & 0xFF);
-    out->b = ((color >> 8) & 0xFF);
+    int offset = y * self->size_x + x;
+    float e = powf(2, *(self->data_e + offset) - 136);
+    out->r = *(self->data_r + offset);
+    out->g = *(self->data_g + offset);
+    out->b = *(self->data_b + offset);
     return col3_smul(out, e, out);
 }
 
@@ -108,17 +108,20 @@ Hdri* hdri(char *filename) {
         return NULL;
     }
 
-    x->data = calloc(sizeof(unsigned int), x->size_x * x->size_y);
-    assert(x->data);
+    x->data_r = malloc(sizeof(char) * x->size_x * x->size_y);
+    assert(x->data_r);
+    x->data_g = malloc(sizeof(char) * x->size_x * x->size_y);
+    assert(x->data_g);
+    x->data_b = malloc(sizeof(char) * x->size_x * x->size_y);
+    assert(x->data_b);
+    x->data_e = malloc(sizeof(char) * x->size_x * x->size_y);
+    assert(x->data_e);
 
     RleDecoder *decoder = rle_decoder(file);
 
     for (unsigned int i = 0; i < x->size_y; i++) {
         for (int j = 0; j < 4; j++) {
-            for (unsigned int k = 0; k < x->size_x; k++) {
-                *(x->data + i * x->size_x + k) <<= 8;
-                *(x->data + i * x->size_x + k) += rle_next_byte(decoder);
-            }
+            rle_read_next(decoder, *(&(x->data_r) + j) + i * x->size_x, x->size_x);
         }
     }
 
