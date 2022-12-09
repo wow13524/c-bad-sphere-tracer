@@ -5,54 +5,47 @@
 #include <string.h>
 #include "hdri.h"
 
-static inline int rle_next_byte_raw(RleDecoder *self, unsigned int offset) {
-    self->bufpos += offset;
-    while (self->bufpos >= READ_BUF_SIZE) {
-        fread(self->buf, READ_BUF_SIZE, 1, self->stream);
-        self->bufpos -= READ_BUF_SIZE;
+/*
+ *Heavily stripped down implementation of a file buffer, only advances when pos
+ *is a multiple of READ_BUF_SIZE (due to frequency of calls, keep it simple!)
+*/
+static inline unsigned char rle_get_buf_byte(FILE *stream, unsigned char *buf, unsigned int pos) {
+    unsigned int wrap = pos % READ_BUF_SIZE;
+    if (!wrap) {
+        fread(buf, READ_BUF_SIZE, 1, stream);
     }
-    return *(self->buf + self->bufpos++);
+    return *(buf + wrap);
 }
 
-//Implements a generator to decode run length encoding of .hdr files
-static inline void rle_read_next(RleDecoder *self, char *out, int count) {
-    register unsigned int ctr_row = self->ctr_row;
-    register char ctr = self->ctr;
-    register char mode = self->mode;
-    register char last = self->last;
-    if (!ctr_row) {
-        ctr_row = 4 * ((rle_next_byte_raw(self, 2) << 8) + rle_next_byte_raw(self, 0));
-    }
-    ctr_row -= count;
-    for (int i = 0; i < count; i++) {
-       if (!ctr) {
-            ctr = rle_next_byte_raw(self, 0);
-            mode = ctr > 128;
-            last = mode ? rle_next_byte_raw(self, 0) : 0;
-            ctr = ctr % 129 + mode;     //0-128 preserved, 129-255 -> 1->127
+static inline void rle_decode(Hdri *self, FILE *stream) {
+    unsigned char buf[READ_BUF_SIZE];
+    unsigned int rowbuf[READ_BUF_SIZE];
+    register unsigned int bufpos = 0;
+    register unsigned char mode = 0;
+    register unsigned char ctr = 0;
+    register unsigned char last = 0;
+    for (unsigned int i = 0; i < self->size_y; i++) {
+        rle_get_buf_byte(stream, buf, bufpos++);
+        rle_get_buf_byte(stream, buf, bufpos++);
+        rle_get_buf_byte(stream, buf, bufpos++);
+        rle_get_buf_byte(stream, buf, bufpos++);
+        for (int _ = 0; _ < 4; _++) {
+            for (unsigned int j = 0; j < self->size_x; j++) {
+                if (!ctr) {
+                    ctr = rle_get_buf_byte(stream, buf, bufpos++);
+                    mode = ctr > 128;
+                    last = mode ? rle_get_buf_byte(stream, buf, bufpos++) : 0;
+                    ctr = mode ? ctr - 128 : ctr;
+                }
+                ctr--;
+                register unsigned int data = *(rowbuf + j);
+                data <<= 8;
+                data += mode ? last : rle_get_buf_byte(stream, buf, bufpos++);
+                *(rowbuf + j) = data;
+            }
+            memcpy(self->data + i * self->size_x, rowbuf, self->size_x * sizeof(unsigned int));
         }
-        ctr--;
-        *(out++) = mode ? last : rle_next_byte_raw(self, 0);
     }
-    self->ctr_row = ctr_row;
-    self->ctr = ctr;
-    self->mode = mode;
-    self->last = last;
-}
-
-RleDecoder* rle_decoder(FILE *stream) {
-    RleDecoder *x = malloc(sizeof(RleDecoder));
-    assert(x);
-    char *buf = malloc(sizeof(char) * READ_BUF_SIZE);
-    assert(buf);
-    x->stream = stream;
-    x->buf = buf;
-    x->bufpos = READ_BUF_SIZE;
-    x->mode = 0;
-    x->ctr = 0;
-    x->ctr_row = 0;
-    x->last = 0;
-    return x;
 }
 
 Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
@@ -62,32 +55,32 @@ Color3* sample(Hdri *self, Vector3 *direction, Color3 *out) {
     unsigned int x = u * (self->size_x - 1);
     unsigned int y = v * (self->size_y - 1);
     
-    int offset = y * self->size_x + x;
-    float e = powf(2, *(self->data_e + offset) - 136);
-    out->r = *(self->data_r + offset);
-    out->g = *(self->data_g + offset);
-    out->b = *(self->data_b + offset);
+    unsigned int color = *(self-> data + y * self->size_x + x);
+    float e = powf(2, (int)(color & 0xFF) - 136);
+    out->r = (color >> 24) & 0xFF;
+    out->g = (color >> 16) & 0xFF;
+    out->b = (color >>  8) & 0xFF;
     return col3_smul(out, e, out);
 }
 
 Hdri* hdri(char *filename) {
     Hdri *x = malloc(sizeof(Hdri));
     assert(x);
-    char *buf = malloc(sizeof(char) * READ_BUF_SIZE);
-    assert(buf);
+
+    char buf[READ_BUF_SIZE];
     FILE *file = fopen(filename, "rb");
+
     if (!strcmp(fgets(buf, READ_BUF_SIZE, file),"#?RADIANCE")) {
         fprintf(stderr, "%s is not a valid .hdr file\n", filename);
-        free(buf);
         fclose(file);
         return NULL;
     }
     if (!strcmp(fgets(buf, READ_BUF_SIZE, file),"FORMAT=32-bit_rle_rgbe")) {
         fprintf(stderr, "%s is not of format 32-bit_rle_rgbe\n", filename);
-        free(buf);
         fclose(file);
         return NULL;
     }
+
     fgetc(file);    //blank line
     fgets(buf, READ_BUF_SIZE, file);    //load dimension info
     char *endptr;
@@ -96,36 +89,19 @@ Hdri* hdri(char *filename) {
     x->size_y = strtol(buf + 3, &endptr, 10);
     if (*endptr != ' ') {
         fprintf(stderr, "%s has invalid y dimension\n", filename);
-        free(buf);
         fclose(file);
         return NULL;
     }
     x->size_x = strtol(endptr + 4, &endptr, 10);
     if (*endptr != '\n') {
         fprintf(stderr, "%s has invalid x dimension\n", filename);
-        free(buf);
         fclose(file);
         return NULL;
     }
 
-    x->data_r = malloc(sizeof(char) * x->size_x * x->size_y);
-    assert(x->data_r);
-    x->data_g = malloc(sizeof(char) * x->size_x * x->size_y);
-    assert(x->data_g);
-    x->data_b = malloc(sizeof(char) * x->size_x * x->size_y);
-    assert(x->data_b);
-    x->data_e = malloc(sizeof(char) * x->size_x * x->size_y);
-    assert(x->data_e);
-
-    RleDecoder *decoder = rle_decoder(file);
-
-    for (unsigned int i = 0; i < x->size_y; i++) {
-        for (int j = 0; j < 4; j++) {
-            rle_read_next(decoder, *(&(x->data_r) + j) + i * x->size_x, x->size_x);
-        }
-    }
-
-    free(buf);
+    x->data = malloc(sizeof(unsigned int) * x->size_x * x->size_y);
+    assert(x->data);
+    rle_decode(x, file);
     fclose(file);
 
     x->sample = sample;

@@ -5,30 +5,14 @@
 #ifndef HDRI_H
 #define HDRI_H
 
-#define READ_BUF_SIZE 65536
-
-typedef struct RleDecoder {
-    FILE *stream;
-    char *buf;
-    unsigned int bufpos;
-    char mode;
-    char ctr;
-    unsigned int ctr_row;
-    char last;
-
-} RleDecoder;
+#define READ_BUF_SIZE 32768
 
 typedef struct Hdri {
     unsigned int size_x;
     unsigned int size_y;
-    char *data_r;
-    char *data_g;
-    char *data_b;
-    char *data_e;
+    unsigned int *data;
     Color3* (*sample)(struct Hdri *self, Vector3 *direction, Color3 *out);
 } Hdri;
-
-RleDecoder* rle_decoder(FILE *stream);
 
 Hdri* hdri(char *filename);
 
