@@ -9,7 +9,7 @@
 #ifndef HDRI_H
 #define HDRI_H
 
-#define READ_BUF_SIZE 32768
+#define READ_BUF_SIZE 16384
 
 typedef struct Hdri {
     unsigned int size_x;

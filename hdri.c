@@ -4,41 +4,41 @@
  *Heavily stripped down implementation of a file buffer, only advances when pos
  *is a multiple of READ_BUF_SIZE (due to frequency of calls, keep it simple!)
 */
-static inline unsigned char rle_get_buf_byte(FILE *stream, unsigned char *buf, unsigned int pos) {
-    unsigned int wrap = pos % READ_BUF_SIZE;
-    if (!wrap) {
+static inline unsigned char rle_get_buf_byte(FILE *stream, unsigned char *buf, unsigned int *pos) {
+    if (*pos >= READ_BUF_SIZE) {
+        *pos -= READ_BUF_SIZE;
         fread(buf, READ_BUF_SIZE, 1, stream);
     }
-    return *(buf + wrap);
+    return *(buf + (*pos)++);
 }
 
 static inline void rle_decode(Hdri *self, FILE *stream) {
     unsigned char buf[READ_BUF_SIZE];
     unsigned int rowbuf[READ_BUF_SIZE];
-    register unsigned int bufpos = 0;
+    unsigned int bufpos = READ_BUF_SIZE;
+    unsigned int *bufposptr = &bufpos;
+    int size_x = self->size_x;
+    int size_y = self->size_y;
     register unsigned char mode = 0;
     register unsigned char ctr = 0;
     register unsigned char last = 0;
-    for (unsigned int i = 0; i < self->size_y; i++) {
-        rle_get_buf_byte(stream, buf, bufpos++);
-        rle_get_buf_byte(stream, buf, bufpos++);
-        rle_get_buf_byte(stream, buf, bufpos++);
-        rle_get_buf_byte(stream, buf, bufpos++);
+    for (int i = 0; i < size_y; i++) {
+        bufpos += 4;
         for (int _ = 0; _ < 4; _++) {
-            for (unsigned int j = 0; j < self->size_x; j++) {
+            for (int j = 0; j < size_x; j++) {
                 if (!ctr) {
-                    ctr = rle_get_buf_byte(stream, buf, bufpos++);
+                    ctr = rle_get_buf_byte(stream, buf, bufposptr);
                     mode = ctr > 128;
-                    last = mode ? rle_get_buf_byte(stream, buf, bufpos++) : 0;
+                    last = mode ? rle_get_buf_byte(stream, buf, bufposptr) : 0;
                     ctr = mode ? ctr - 128 : ctr;
                 }
                 ctr--;
                 register unsigned int data = *(rowbuf + j);
                 data <<= 8;
-                data += mode ? last : rle_get_buf_byte(stream, buf, bufpos++);
+                data += mode ? last : rle_get_buf_byte(stream, buf, bufposptr);
                 *(rowbuf + j) = data;
             }
-            memcpy(self->data + i * self->size_x, rowbuf, self->size_x * sizeof(unsigned int));
+            memcpy(self->data + i * size_x, rowbuf, size_x * sizeof(unsigned int));
         }
     }
 }
