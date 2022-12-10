@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #include "color3.h"
 
 int colors = 0;
@@ -21,10 +22,11 @@ unsigned int col3_to_int(Color3 *a) {
 }
 
 Color3* col3_cpy(Color3 *a, Color3 *out) {
-    vst1q_f32(
+    /*vst1q_f32(
         (float32_t *)out,
         *((float32x4_t *)a)
-    );
+    );*/
+    memcpy(out, a, sizeof(Color3));
     return out;
 }
 

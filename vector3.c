@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #include "vector3.h"
 
 int vectors = 0;
@@ -32,13 +33,14 @@ Vector3* vec3_cpy(Vector3 *a, Vector3 *out) {
         (float32_t *)out,
         vld1q_f32((float32_t *)a)
     );*/
-    asm volatile (
+    /*asm volatile (
     "vld1.f32  {q0}, [%0]       \n\t"
     "vst1.f32  {q0}, [%1]       \n\t"
     :
     : "r"(a), "r"(out)
     : "q0", "memory"
-    );
+    );*/
+    memcpy(out, a, sizeof(Vector3));
     return out;
 }
 
