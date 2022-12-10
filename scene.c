@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <float.h>
-#include <math.h>
 #include "scene.h"
 
 int pixels = 0;
@@ -18,7 +13,7 @@ void add_light(Scene *self, Light *light) {
     *(self->lights + self->light_count++) = light;
 }
 
-float map(Scene *self, float32x4_t position, SDFInstance **out) {
+float map(Scene *self, Vector3 *position, SDFInstance **out) {
     if (!self->instance_count) {
         *out = NULL;
         return FLT_MAX;
@@ -40,7 +35,7 @@ float map(Scene *self, float32x4_t position, SDFInstance **out) {
 }
 
 int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
-    return map(self, vld1q_f32((float32_t *)position), out) < 0;
+    return map(self, position, out) < 0;
 }
 
 //TODO leverage explicit surface formulas
@@ -57,7 +52,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     float total_distance = 0;
     float next_step = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
-        float radius = direction * map(self, vld1q_f32((float32_t *)vec3_add(r->origin, vec3_mul(r->direction, total_distance, &temp_v), out)), &result);
+        float radius = direction * map(self, vec3_add(r->origin, vec3_mul(r->direction, total_distance, &temp_v), out), &result);
         float abs_radius = fabsf(radius);
         if (omega != 1 && omega * last_radius > last_radius + abs_radius) {
             next_step -= omega * next_step;
@@ -111,29 +106,20 @@ float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) 
     
 }
 
-float get_distance_axis(SDFInstance *instance, float32x4_t position, float32x4_t axis) {
-    return instance->get_distance(instance, vaddq_f32(position, axis))
-         - instance->get_distance(instance, vsubq_f32(position, axis));
+float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
+    Vector3 temp_v = {};
+    return instance->get_distance(instance, vec3_add(position, axis, &temp_v))
+         - instance->get_distance(instance, vec3_sub(position, axis, &temp_v));
 }
 
-float32x4_t get_normal(SDFInstance *instance, float32x4_t position) {
-    static float32x4_t dx = (float32x4_t){EPSILON, 0, 0, 0};
-    static float32x4_t dy = (float32x4_t){0, EPSILON, 0, 0};
-    static float32x4_t dz = (float32x4_t){0, 0, EPSILON, 0};
-    float32x4_t out = (float32x4_t){
-        get_distance_axis(instance, position, dx),
-        get_distance_axis(instance, position, dy),
-        get_distance_axis(instance, position, dz),
-        0
-    };
-    float32x4_t out2 = vmulq_f32(out, out);
-    return vmulq_n_f32(out,
-        1 / sqrt(
-            vgetq_lane_f32(out2, 0)
-            + vgetq_lane_f32(out2, 1)
-            + vgetq_lane_f32(out2, 2)
-        )
-    );
+Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
+    static Vector3 dx = {EPSILON, 0, 0, 0};
+    static Vector3 dy = {0, EPSILON, 0, 0};
+    static Vector3 dz = {0, 0, EPSILON, 0};
+    out->x = get_distance_axis(instance, position, &dx);
+    out->y = get_distance_axis(instance, position, &dy);
+    out->z = get_distance_axis(instance, position, &dz);
+    return vec3_unit(out, out);
 }
 
 //TODO take instance transmission into account
@@ -227,10 +213,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             curr_position
         ));
         if (hit_instance) {
-            vst1q_f32(
-                (float32_t *)curr_normal,
-                get_normal(hit_instance, vld1q_f32((float32_t *)curr_position))
-            );
+            get_normal(hit_instance, curr_position, curr_normal);
             if (vec3_dot(curr_ray->direction, curr_normal) > 0) {
                 vec3_neg(curr_normal, curr_normal);
             }
@@ -324,14 +307,6 @@ unsigned int* render(Scene *self, Camera *camera) {
     Vector3 *temp_v2 = vector3(0, 0, 0);
     Ray *temp_r = ray(temp_v1, temp_v2);
     float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
-
-    //Cache position and size as neon types
-    for (int i = 0; i < self->instance_count; i++) {
-        refresh_instance((*(self->instances + i))->instance);
-    }
-    for (int i = 0; i < self->light_count; i++) {
-        refresh_instance((*(self->lights + i))->instance);
-    }
 
     for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {

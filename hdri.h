@@ -1,4 +1,8 @@
+#include <assert.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "color3.h"
 #include "vector3.h"
 

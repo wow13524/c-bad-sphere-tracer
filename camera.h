@@ -1,5 +1,9 @@
+#include <assert.h>
+#include <float.h>
+#include <math.h>
+#include <stdlib.h>
+#include "instance.h"
 #include "ray.h"
-#include "sdf_instance.h"
 
 #ifndef CAMERA_H
 #define CAMERA_H

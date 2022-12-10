@@ -1,4 +1,7 @@
-#include <arm_neon.h>
+#include <assert.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef COLOR3_H
 #define COLOR3_H
@@ -6,10 +9,10 @@
 int colors;
 
 typedef struct Color3 {
-    float32_t r;
-    float32_t g;
-    float32_t b;
-    float32_t _;
+    float r;
+    float g;
+    float b;
+    float _;
 } Color3;
 
 Color3* color3(float r, float g, float b);

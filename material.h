@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <stdlib.h>
 #include "color3.h"
 
 #ifndef MATERIAL_H

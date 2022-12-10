@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
 #include "render_output.h"
 #include "scene.h"
 

@@ -1,3 +1,6 @@
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "color3.h"
 
 #ifndef RENDER_OUTPUT_H

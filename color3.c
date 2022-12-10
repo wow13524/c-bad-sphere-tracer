@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
-#include <string.h>
 #include "color3.h"
 
 int colors = 0;
@@ -18,31 +13,20 @@ Color3* color3(float r, float g, float b) {
 }
 
 unsigned int col3_to_int(Color3 *a) {
-    return ((int)(255 * a->r) << 16) + ((int)(255 * a->g) << 8) + (int)(255 * a->b);
+    return    ((int)(255 * a->r) << 16)
+            + ((int)(255 * a->g) << 8)
+            + (int)(255 * a->b);
 }
 
 Color3* col3_cpy(Color3 *a, Color3 *out) {
-    /*vst1q_f32(
-        (float32_t *)out,
-        *((float32x4_t *)a)
-    );*/
     memcpy(out, a, sizeof(Color3));
     return out;
 }
 
 Color3* col3_clamp(Color3 *a, Color3 *out) {
-    static float32x4_t zero = (float32x4_t){0,0,0,0};
-    static float32x4_t one = (float32x4_t){1,1,1,1};
-    vst1q_f32(
-        (float32_t *)out,
-        vmaxq_f32(
-            zero,
-            vminq_f32(
-                *((float32x4_t *)a),
-                one
-            )
-        )
-    );
+    out->r = fmaxf(0, fminf(a->r, 1));
+    out->g = fmaxf(0, fminf(a->g, 1));
+    out->b = fmaxf(0, fminf(a->b, 1));
     return out;
 }
 
@@ -61,39 +45,27 @@ Color3* col3_log(Color3 *a, Color3 *out) {
 }
 
 Color3* col3_add(Color3 *a, Color3 *b, Color3 *out) {
-    vst1q_f32(
-        (float32_t *)out,
-        vaddq_f32(
-            vld1q_f32((float32_t *)a),
-            vld1q_f32((float32_t *)b)
-        )
-    );
+    out->r = a->r + b->r;
+    out->g = a->g + b->g;
+    out->b = a->b + b->b;
     return out;
 }
 
 Color3* col3_mul(Color3 *a, Color3 *b, Color3 *out) {
-    vst1q_f32(
-        (float32_t *)out,
-        vmulq_f32(
-            vld1q_f32((float32_t *)a),
-            vld1q_f32((float32_t *)b)
-        )
-    );
+    out->r = a->r * b->r;
+    out->g = a->g * b->g;
+    out->b = a->b * b->b;
     return out;
 }
 
 Color3* col3_div(Color3 *a, Color3 *b, Color3 *out) {
-    vst1q_f32(
-        (float32_t *)out,
-        vmulq_f32(
-            vld1q_f32((float32_t *)a),
-            vrecpeq_f32(vld1q_f32((float32_t *)b))
-        )
-    );
+    out->r = a->r / b->r;
+    out->g = a->g / b->g;
+    out->b = a->b / b->b;
     return out;
 }
 
-Color3* col3_sadd(Color3 *a, float c, Color3 *out) {    //vaddq_n_f32 not defined :(
+Color3* col3_sadd(Color3 *a, float c, Color3 *out) {
     out->r = a->r + c;
     out->g = a->g + c;
     out->b = a->b + c;
@@ -101,18 +73,17 @@ Color3* col3_sadd(Color3 *a, float c, Color3 *out) {    //vaddq_n_f32 not define
 }
 
 Color3* col3_smul(Color3 *a, float c, Color3 *out) {
-    vst1q_f32(
-        (float32_t *)out,
-        vmulq_n_f32(
-            vld1q_f32((float32_t *)a),
-            c
-        )
-    );
+    out->r = a->r * c;
+    out->g = a->g * c;
+    out->b = a->b * c;
     return out;
 }
 
 Color3* col3_sdiv(Color3 *a, float c, Color3 *out) {
-    return col3_smul(a, 1 / c, out);
+    out->r = a->r / c;
+    out->g = a->g / c;
+    out->b = a->b / c;
+    return out;
 }
 Color3* col3_spow(Color3 *a, float c, Color3 *out) {
     out->r = powf(a->r, c);
@@ -122,17 +93,8 @@ Color3* col3_spow(Color3 *a, float c, Color3 *out) {
 }
 
 Color3* col3_lerp(Color3 *a, Color3 *b, float c, Color3 *out) {
-    float32x4_t fa = vld1q_f32((float32_t *)a);
-    float32x4_t fb = vld1q_f32((float32_t *)b);
-    vst1q_f32(
-        (float32_t *)out,
-        vaddq_f32(
-            fa,
-            vmulq_n_f32(
-                vsubq_f32(fb, fa),
-                c
-            )
-        )
-    );
+    out->r = a->r + c * (b->r - a->r);
+    out->g = a->g + c * (b->g - a->g);
+    out->b = a->b + c * (b->b - a->b);
     return out;
 }

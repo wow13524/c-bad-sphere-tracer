@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <float.h>
 #include "light.h"
 
 Light* light(brightness_function_t brightness_function, enum LightVisibility visibility) {

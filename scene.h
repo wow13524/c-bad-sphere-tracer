@@ -1,3 +1,8 @@
+#include <assert.h>
+#include <float.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "camera.h"
 #include "hdri.h"
 #include "light.h"

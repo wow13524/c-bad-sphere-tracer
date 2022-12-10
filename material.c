@@ -1,5 +1,3 @@
-#include <stdlib.h>
-#include <assert.h>
 #include "material.h"
 
 Material* material() {

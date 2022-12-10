@@ -1,3 +1,6 @@
+#include <assert.h>
+#include <stdlib.h>
+#include "color3.h"
 #include "instance.h"
 
 #ifndef LIGHT_H
