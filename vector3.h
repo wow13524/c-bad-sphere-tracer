@@ -69,6 +69,13 @@ __attribute__((always_inline)) inline Vector3* vec3_mul(Vector3 *a, float c, Vec
     return out;
 }
 
+__attribute__((always_inline)) inline Vector3* vec3_fma(Vector3 *a, Vector3 *b, float c, Vector3 *out) {
+    out->x = fmaf(b->x, c, a->x);
+    out->y = fmaf(b->y, c, a->y);
+    out->z = fmaf(b->z, c, a->z);
+    return out;
+}
+
 __attribute__((always_inline)) inline Vector3* vec3_div(Vector3 *a, float c, Vector3 *out) {
     out->x = a->x / c;
     out->y = a->y / c;

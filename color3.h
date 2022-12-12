@@ -26,6 +26,7 @@ Color3* col3_mul(Color3 *a, Color3 *b, Color3 *out);
 Color3* col3_div(Color3 *a, Color3 *b, Color3 *out);
 Color3* col3_sadd(Color3 *a, float c, Color3 *out);
 Color3* col3_smul(Color3 *a, float c, Color3 *out);
+Color3* col3_sfma(Color3 *a, Color3 *b, float c, Color3 *out);
 Color3* col3_sdiv(Color3 *a, float c, Color3 *out);
 Color3* col3_spow(Color3 *a, float c, Color3 *out);
 Color3* col3_lerp(Color3 *a, Color3 *b, float c, Color3 *out);

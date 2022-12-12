@@ -79,6 +79,13 @@ Color3* col3_smul(Color3 *a, float c, Color3 *out) {
     return out;
 }
 
+Color3* col3_sfma(Color3 *a, Color3 *b, float c, Color3 *out) {
+    out->r = fmaf(b->r, c, a->r);
+    out->g = fmaf(b->g, c, a->g);
+    out->b = fmaf(b->b, c, a->b);
+    return out;
+}
+
 Color3* col3_sdiv(Color3 *a, float c, Color3 *out) {
     out->r = a->r / c;
     out->g = a->g / c;

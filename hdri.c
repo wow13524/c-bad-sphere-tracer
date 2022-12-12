@@ -1,9 +1,5 @@
 #include "hdri.h"
 
-/*
- *Heavily stripped down implementation of a file buffer, only advances when pos
- *is a multiple of READ_BUF_SIZE (due to frequency of calls, keep it simple!)
-*/
 static inline unsigned char rle_get_buf_byte(FILE *stream, unsigned char *buf, unsigned int *pos) {
     if (*pos >= READ_BUF_SIZE) {
         *pos -= READ_BUF_SIZE;

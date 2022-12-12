@@ -14,19 +14,20 @@ void add_light(Scene *self, Light *light) {
 }
 
 float map(Scene *self, Vector3 *position, SDFInstance **out) {
-    if (!self->instance_count) {
+    register int instance_count;
+    if (!(instance_count = self->instance_count)) {
         *out = NULL;
         return FLT_MAX;
     }
     *out = *self->instances;
-    float closest_distance = (*out)->get_distance(*out, position);
-    for (int j = 1; j < self->instance_count; j++) {
+    register float closest_distance = (*out)->get_distance(*out, position);
+    for (int j = 1; j < instance_count; j++) {
         SDFInstance *instance = *(self->instances + j);
         float distance = instance->get_distance(instance, position);
         if (distance < closest_distance) {
             closest_distance = distance;
             *out = instance;
-            if (distance < EPSILON) {
+            if (closest_distance < EPSILON) {
                 break;
             }
         }
@@ -43,16 +44,15 @@ int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
 //Over-relaxation sphere tracing: https://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     marches++;
-    static Vector3 temp_v = (Vector3){};
     SDFInstance *result = NULL;
     SDFInstance *temp = NULL;
     int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
-    float omega = 1.75; //Over-relaxation factor [1, 2)
+    register float omega = 1.75; //Over-relaxation factor [1, 2)
     float last_radius = 0;
     float total_distance = 0;
     float next_step = 0;
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
-        float radius = direction * map(self, vec3_add(r->origin, vec3_mul(r->direction, total_distance, &temp_v), out), &result);
+        float radius = direction * map(self, vec3_fma(r->origin, r->direction, total_distance, out), &result);
         float abs_radius = fabsf(radius);
         if (omega != 1 && omega * last_radius > last_radius + abs_radius) {
             next_step -= omega * next_step;
@@ -67,7 +67,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
             result = NULL;
             break;
         }
-        else if (abs_radius < EPSILON) {
+        if (abs_radius < EPSILON) {
             break;
         }
 
@@ -124,23 +124,29 @@ Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
 
 //TODO take instance transmission into account
 Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
-    static Color3 temp_c = (Color3){};
-    static Vector3 temp_v1 = (Vector3){};
-    static Vector3 temp_v2 = (Vector3){};
-    static Vector3 temp_v3 = (Vector3){};
-    static Ray temp_r = (Ray){&temp_v3, &temp_v1};
-    perturb_vector3(position, normal, &temp_v3);
+    Vector3 temp_v = (Vector3){};
+    Vector3 origin = (Vector3){};
+    Vector3 direction = (Vector3){};
+    Ray temp_r = (Ray){&origin, &direction};
+    perturb_vector3(position, normal, &origin);
     col3_smul(out, 0, out);
-    for (int i = 0; i < self->light_count; i++) {
-        Light *l = *(self->lights + i);
-        Vector3 *offset = vec3_sub(l->instance->position, position, &temp_v1);
-        float offset_mag = 0;
-        if (l->visibility == ALWAYS_VISIBLE || ((offset_mag = vec3_mag(offset)) && vec3_unit(offset, offset) && !ray_march(self, &temp_r, offset_mag, &temp_v2))) {
+    register Light **lights = self->lights;
+    register int light_count = self->light_count;
+    for (int i = 0; i < light_count; i++) {
+        Light *l = *(lights + i);
+        Vector3 *offset = vec3_sub(l->instance->position, position, &direction);
+        int is_visible = l->visibility == ALWAYS_VISIBLE;
+        if (!is_visible) {
+            float offset_mag = vec3_mag(offset);
+            vec3_unit(offset, offset);
+            is_visible = ray_march(self, &temp_r, offset_mag, &temp_v) == NULL;
+        }
+        if (is_visible) {
             float local_brightness = l->get_brightness(l, position);
             if (l->visibility == LINE_OF_SIGHT) {
-                local_brightness *= vec3_dot(normal, vec3_unit(offset, &temp_v1));
+                local_brightness *= vec3_dot(normal, offset);
             }
-            col3_add(out, col3_smul(l->color, local_brightness, &temp_c), out);
+            col3_sfma(out, l->color, local_brightness, out);
         }
     }
     return out;
@@ -239,7 +245,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
                 if (hit_instance->material->checker) {
                     diffuse_alpha *= ((int)floorf(curr_position->x / 2) % 2 + (int)floorf(curr_position->y / 2) % 2 + (int)floorf(curr_position->z / 2) % 2) % 2 ? 1 : .375;
                 }
-                col3_add(out, col3_smul(col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), curr_attenuation, temp_c), diffuse_alpha, temp_c), out);
+                col3_sfma(out, col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), curr_attenuation, temp_c), diffuse_alpha, out);
             }
 
             if (curr_depth < SCENE_RECURSION_DEPTH) {
@@ -270,10 +276,33 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
             }
         }
         else if (self->environment) {
-            col3_add(out, col3_smul(col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), curr_attenuation, temp_c), curr_alpha, temp_c), out);
+            col3_sfma(out, col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), curr_attenuation, temp_c), curr_alpha, out);
         }
     } while (++offset < total);
 
+    return out;
+}
+
+Color3 *get_color_monte_carlo(Scene *self, Ray *r, Color3 *out) {
+    Color3 temp_c = {};
+    Vector3 position = {};
+    float rr_prob = 1;
+    col3_smul(out, 0, out);
+    do {
+        SDFInstance *hit_instance = ray_march(
+            self,
+            r,
+            SCENE_MARCH_DIST_MAX,
+            &position
+        );
+        
+        if (!hit_instance) {
+            col3_add(out, self->environment->sample(self->environment, r->direction, &temp_c), out);
+            break;
+        }
+        col3_add(out, hit_instance->material->color, out);
+        rr_prob = 0;
+    } while (rr_prob > (float)rand() / RAND_MAX);
     return out;
 }
 
@@ -321,8 +350,8 @@ unsigned int* render(Scene *self, Camera *camera) {
                         temp_r
                     );
                     get_color_iterative(self, temp_r, temp_c);
-                    col3_smul(temp_c, alpha, temp_c);
-                    col3_add(temp_cout, temp_c, temp_cout);
+                    //get_color_monte_carlo(self, temp_r, temp_c);
+                    col3_sfma(temp_cout, temp_c, alpha, temp_cout);
                 }
             }
             *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
