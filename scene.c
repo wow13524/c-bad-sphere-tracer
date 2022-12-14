@@ -88,7 +88,7 @@ Vector3* reflect_vector3(Vector3 *direction, Vector3 *normal, Vector3 *out) {
 }
 
 Vector3* refract_vector3(Vector3 *direction, Vector3 *normal, float r, Vector3 *out) {
-    static Vector3 temp_v = (Vector3){};
+    Vector3 temp_v = (Vector3){};
     float c = vec3_dot(normal, direction);
     float s =  1 - r * r * (1 - c * c);
     if (s < 0) {
@@ -362,8 +362,8 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, Color3 *out) {
 }
 
 Color3* tonemap(Color3 *a, Color3 *out) {
-    static Color3 temp_c1 = (Color3){};
-    static Color3 temp_c2 = (Color3){};
+    Color3 temp_c1 = (Color3){};
+    Color3 temp_c2 = (Color3){};
 
     out->r = 0.59719 * a->r + 0.35458 * a->g + 0.04823 * a->b;
     out->g = 0.07600 * a->r + 0.90834 * a->g + 0.01566 * a->b;
@@ -382,9 +382,12 @@ Color3* tonemap(Color3 *a, Color3 *out) {
     return out;
 }
 
-unsigned int* render(Scene *self, Camera *camera) {
-    unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
-    assert(output);
+static inline void render_thread(SceneRenderArgs *args) {
+    Scene *self = args->self;
+    Camera *camera = args->camera;
+    unsigned int thread_i = args->thread_i;
+    unsigned int *output = args->output;
+
     Color3 *temp_c = color3(0, 0, 0);
     Color3 *temp_cout = color3(0, 0, 0);
     Vector3 *temp_v1 = vector3(0, 0, 0);
@@ -392,7 +395,10 @@ unsigned int* render(Scene *self, Camera *camera) {
     Ray *temp_r = ray(temp_v1, temp_v2);
     float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
 
-    for (int i = 0; i < SCENE_OUTPUT_HEIGHT; i++) {
+    int i_start = thread_i * ((float) SCENE_OUTPUT_HEIGHT / SCENE_RENDER_THREADS);
+    int i_end = (thread_i + 1) * ((float) SCENE_OUTPUT_HEIGHT / SCENE_RENDER_THREADS);
+
+    for (int i = i_start; i < i_end; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             pixels++;
             temp_cout = col3_smul(temp_cout, 0, temp_cout);
@@ -412,12 +418,28 @@ unsigned int* render(Scene *self, Camera *camera) {
             *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
         }
     }
-    fprintf(stderr, "%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
     free(temp_c);
     free(temp_cout);
     free(temp_r);
     free(temp_v1);
     free(temp_v2);
+}
+
+unsigned int* render(Scene *self, Camera *camera) {
+    pthread_t threads[SCENE_RENDER_THREADS];
+    SceneRenderArgs thread_args[SCENE_RENDER_THREADS];
+    unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
+    assert(output);
+    
+    for (int i = 0; i < SCENE_RENDER_THREADS; i++) {
+        *(thread_args + i) = (SceneRenderArgs){self, camera, i, output};
+        pthread_create(threads + i, NULL, (void *)render_thread, thread_args + i);
+    }
+    for (int i = 0; i < SCENE_RENDER_THREADS; i++) {
+        pthread_join(*(threads + i), NULL);
+    }
+
+    fprintf(stderr, "%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
     return output;
 }
 

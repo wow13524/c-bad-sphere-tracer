@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <float.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "camera.h"
@@ -21,6 +22,7 @@
 #define SCENE_OUTPUT_WIDTH 192
 #define SCENE_OUTPUT_SAMPLES 8
 #define SCENE_RECURSION_DEPTH 8
+#define SCENE_RENDER_THREADS 4
 
 typedef struct Scene {
     int instance_count;
@@ -32,6 +34,13 @@ typedef struct Scene {
     void (*add_light)(struct Scene *self, Light *light);
     unsigned int* (*render)(struct Scene *self, Camera *camera);
 } Scene;
+
+typedef struct SceneRenderArgs {
+    Scene *self;
+    Camera *camera;
+    unsigned int thread_i;
+    unsigned int *output;
+} SceneRenderArgs;
 
 Scene* scene();
 
