@@ -12,7 +12,6 @@ typedef struct Vector3 {
     float x;
     float y;
     float z;
-    float _;
 } Vector3;
 
 Vector3* vector3(float x, float y, float z);

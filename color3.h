@@ -12,7 +12,6 @@ typedef struct Color3 {
     float r;
     float g;
     float b;
-    float _;
 } Color3;
 
 Color3* color3(float r, float g, float b);

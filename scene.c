@@ -3,8 +3,8 @@
 int pixels = 0;
 int marches = 0;
 
-static inline float rand2() {
-    return (float)rand() / RAND_MAX;
+static inline float rand2(void *state) {
+    return (float)rand_r(state) / RAND_MAX;
 }
 
 void add_instance(Scene *self, SDFInstance *instance) {
@@ -117,9 +117,9 @@ float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis)
 }
 
 Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
-    static Vector3 dx = {EPSILON, 0, 0, 0};
-    static Vector3 dy = {0, EPSILON, 0, 0};
-    static Vector3 dz = {0, 0, EPSILON, 0};
+    static Vector3 dx = {EPSILON, 0, 0};
+    static Vector3 dy = {0, EPSILON, 0};
+    static Vector3 dz = {0, 0, EPSILON};
     out->x = get_distance_axis(instance, position, &dx);
     out->y = get_distance_axis(instance, position, &dy);
     out->z = get_distance_axis(instance, position, &dz);
@@ -289,7 +289,7 @@ Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
     return out;
 }
 
-Color3 *get_color_monte_carlo(Scene *self, Ray *r, Color3 *out) {
+Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out) {
     SDFInstance *temp_i;
     Color3 temp_c = {};
     Vector3 temp_v = {};
@@ -331,7 +331,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, Color3 *out) {
         col3_sfma(out, mat->color, diffuse * alpha, out);
         if (diffuse < 1) {
             alpha *= 1 - diffuse;
-            if (rand2() * (reflectance + transmission) < reflectance) {
+            if (rand2(rand_state) * (reflectance + transmission) < reflectance) {
                 perturb_vector3(&position, &normal, &origin);
                 reflect_vector3(&direction, &normal, &temp_v);
                 vec3_cpy(&temp_v, &direction);
@@ -357,7 +357,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, Color3 *out) {
             alpha = 0;
             rr = 0;
         }
-    } while ((rr *= .99) > rand2());
+    } while ((rr *= .99) > rand2(rand_state));
     return out;
 }
 
@@ -387,6 +387,7 @@ static inline void render_thread(SceneRenderArgs *args) {
     Camera *camera = args->camera;
     unsigned int thread_i = args->thread_i;
     unsigned int *output = args->output;
+    unsigned int rand_state = thread_i;
 
     Color3 *temp_c = color3(0, 0, 0);
     Color3 *temp_cout = color3(0, 0, 0);
@@ -411,7 +412,7 @@ static inline void render_thread(SceneRenderArgs *args) {
                         temp_r
                     );
                     //get_color_iterative(self, temp_r, temp_c);
-                    get_color_monte_carlo(self, temp_r, temp_c);
+                    get_color_monte_carlo(self, temp_r, &rand_state, temp_c);
                     col3_sfma(temp_cout, temp_c, alpha, temp_cout);
                 }
             }
