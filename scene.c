@@ -1,8 +1,5 @@
 #include "scene.h"
 
-int pixels = 0;
-int marches = 0;
-
 static inline float rand2(void *state) {
     return (float)rand_r(state) / RAND_MAX;
 }
@@ -47,7 +44,6 @@ int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
 //Leave ray marching for implicit surfaces (mandelbulb, etc.)
 //Over-relaxation sphere tracing: https://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
-    marches++;
     SDFInstance *result = NULL;
     SDFInstance *temp = NULL;
     int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
@@ -401,7 +397,6 @@ static inline void render_thread(SceneRenderArgs *args) {
 
     for (int i = i_start; i < i_end; i++) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
-            pixels++;
             temp_cout = col3_smul(temp_cout, 0, temp_cout);
             for (int k = 0; k < SCENE_OUTPUT_SAMPLES; k++) {
                 for (int l = 0; l < SCENE_OUTPUT_SAMPLES; l++) {
@@ -439,8 +434,6 @@ unsigned int* render(Scene *self, Camera *camera) {
     for (int i = 0; i < SCENE_RENDER_THREADS; i++) {
         pthread_join(*(threads + i), NULL);
     }
-
-    fprintf(stderr, "%d pixels resulted in %d marches with a total of %d Vector3s and %d Color3s created\n", pixels, marches, vectors, colors);
     return output;
 }
 
