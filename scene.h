@@ -40,6 +40,7 @@ typedef struct SceneRenderArgs {
     Camera *camera;
     unsigned int thread_i;
     unsigned int *output;
+    int *line_cnt;
 } SceneRenderArgs;
 
 Scene* scene();

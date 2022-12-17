@@ -15,14 +15,9 @@ void add_light(Scene *self, Light *light) {
 }
 
 float map(Scene *self, Vector3 *position, SDFInstance **out) {
-    register int instance_count;
-    if (!(instance_count = self->instance_count)) {
-        *out = NULL;
-        return FLT_MAX;
-    }
     *out = *self->instances;
     register float closest_distance = (*out)->get_distance(*out, position);
-    for (int j = 1; j < instance_count; j++) {
+    for (int j = 1; j < self->instance_count; j++) {
         SDFInstance *instance = *(self->instances + j);
         float distance = instance->get_distance(instance, position);
         if (distance < closest_distance) {
@@ -45,23 +40,27 @@ int is_inside_instance(Scene *self, Vector3 *position, SDFInstance **out) {
 //Over-relaxation sphere tracing: https://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf
 SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     SDFInstance *result = NULL;
-    SDFInstance *temp = NULL;
-    int direction = is_inside_instance(self, r->origin, &temp) ? -1 : 1;
-    register float omega = 1.75; //Over-relaxation factor [1, 2)
+    int direction = is_inside_instance(self, r->origin, &result) ? -1 : 1;
+    register int backtracked = 0;
+    register float omega = 1.99; //Over-relaxation factor [1, 2)
     float last_radius = 0;
     float total_distance = 0;
     float next_step = 0;
+    vec3_cpy(r->origin, out);
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
-        float radius = direction * map(self, vec3_fma(r->origin, r->direction, total_distance, out), &result);
+        float radius = direction * map(self, out, &result);
         float abs_radius = fabsf(radius);
-        if (omega != 1 && omega * last_radius > last_radius + abs_radius) {
+        if (backtracked) {
+            next_step = radius;
+        }
+        else if (omega * last_radius > last_radius + abs_radius) {
             next_step -= omega * next_step;
-            omega = 1;
+            backtracked = 1;
         }
         else {
+            last_radius = abs_radius;
             next_step = omega * radius;
         }
-        last_radius = abs_radius;
         total_distance += next_step;
          if (total_distance > t_max) {
             result = NULL;
@@ -70,6 +69,7 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
         if (abs_radius < EPSILON) {
             break;
         }
+        vec3_fma(r->origin, r->direction, total_distance, out);
     }
     return result;
 }
@@ -349,7 +349,6 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
             }
         }
         else {
-            alpha = 0;
             rr = 0;
         }
     } while ((rr *= .99) > rand2(rand_state));
@@ -382,6 +381,7 @@ static inline void render_thread(SceneRenderArgs *args) {
     Camera *camera = args->camera;
     unsigned int thread_i = args->thread_i;
     unsigned int *output = args->output;
+    int *line_cnt = args->line_cnt;
     unsigned int rand_state = thread_i;
 
     Color3 *temp_c = color3(0, 0, 0);
@@ -391,10 +391,8 @@ static inline void render_thread(SceneRenderArgs *args) {
     Ray *temp_r = ray(temp_v1, temp_v2);
     float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
 
-    int i_start = thread_i * ((float) SCENE_OUTPUT_HEIGHT / SCENE_RENDER_THREADS);
-    int i_end = (thread_i + 1) * ((float) SCENE_OUTPUT_HEIGHT / SCENE_RENDER_THREADS);
-
-    for (int i = i_start; i < i_end; i++) {
+    int i;
+    while ((i = (*line_cnt)++) < SCENE_OUTPUT_HEIGHT) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
             temp_cout = col3_smul(temp_cout, 0, temp_cout);
             for (int k = 0; k < SCENE_OUTPUT_SAMPLES; k++) {
@@ -425,9 +423,14 @@ unsigned int* render(Scene *self, Camera *camera) {
     SceneRenderArgs thread_args[SCENE_RENDER_THREADS];
     unsigned int *output = malloc(sizeof(unsigned int *) * SCENE_OUTPUT_HEIGHT * SCENE_OUTPUT_WIDTH);
     assert(output);
+    int line_cnt = 0;
+
+    if (!self->instance_count) {
+        return output;
+    }
     
     for (int i = 0; i < SCENE_RENDER_THREADS; i++) {
-        *(thread_args + i) = (SceneRenderArgs){self, camera, i, output};
+        *(thread_args + i) = (SceneRenderArgs){self, camera, i, output, &line_cnt};
         pthread_create(threads + i, NULL, (void *)render_thread, thread_args + i);
     }
     for (int i = 0; i < SCENE_RENDER_THREADS; i++) {

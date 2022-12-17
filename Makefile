@@ -16,7 +16,7 @@ DEBUG	=
 CSTD	=
 WARN	= -Wall -Wextra -Werror
 CDEFS	=
-CFLAGS	= -O3 -lm -pthread -march=armv8-a+crc+nocrypto -mfloat-abi=hard -mfpu=fp-armv8 -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
+CFLAGS	= -Ofast -lm -pthread -march=armv8-a+crc+nocrypto -mfloat-abi=hard -mfpu=fp-armv8 -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
 
 $(OBJ):	$(HEAD)
 
