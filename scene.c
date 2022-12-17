@@ -70,7 +70,6 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
         if (abs_radius < EPSILON) {
             break;
         }
-
     }
     return result;
 }
