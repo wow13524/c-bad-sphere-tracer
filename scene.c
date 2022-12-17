@@ -288,7 +288,9 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
     SDFInstance *temp_i;
     Color3 temp_c = {};
     Vector3 temp_v = {};
+    Color3 attenuation = {1, 1, 1};
     Vector3 position = {};
+    Vector3 position_last = {};
     Vector3 position_pn = {};
     Vector3 normal = {};
     Vector3 normal_neg = {};
@@ -300,6 +302,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
     float ior = SCENE_ATMOSPHERE_IOR;
     col3_smul(out, 0, out);
     do {
+        vec3_cpy(&position, &position_last);
         SDFInstance *hit_instance = ray_march(
             self,
             &cr,
@@ -307,7 +310,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
             &position
         );
         if (!hit_instance) {
-            col3_sfma(out, self->environment->sample(self->environment, &direction, &temp_c), alpha, out);
+            col3_sfma(out, col3_mul(self->environment->sample(self->environment, &direction, &temp_c), &attenuation, &temp_c), alpha, out);
             break;
         }
 
@@ -316,6 +319,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         get_normal(hit_instance, &position, &normal);
         if (vec3_dot(&direction, &normal) > 0) {
             vec3_neg(&normal, &normal);
+            col3_mul(&attenuation, col3_exp(col3_smul(col3_log(mat->color, &temp_c), vec3_mag(vec3_sub(&position, &position_last, &temp_v)), &temp_c), &temp_c), &attenuation);
         }
 
         float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
@@ -323,7 +327,6 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         float transmission = (1 - reflectance) * mat->transmission;
         float diffuse = (1 - mat->reflectance) * (1 - mat->transmission);
 
-        col3_sfma(out, mat->color, diffuse * alpha, out);
         if (diffuse < 1) {
             alpha *= 1 - diffuse;
             if (rand2(rand_state) * (reflectance + transmission) < reflectance) {
@@ -344,13 +347,19 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
                     ior = next_ior;
                 }
                 else {
-                    alpha = 0;
+                    perturb_vector3(&position, &normal, &origin);
+                    reflect_vector3(&direction, &normal, &temp_v);
+                    vec3_cpy(&temp_v, &direction);
                 }
             }
         }
         else {
             rr = 0;
         }
+        if (hit_instance->material->checker) {
+            diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+        }
+        col3_sfma(out, col3_mul(mat->color, &attenuation, &temp_c), diffuse * alpha, out);
     } while ((rr *= .99) > rand2(rand_state));
     return out;
 }
