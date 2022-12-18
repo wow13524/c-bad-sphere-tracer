@@ -151,144 +151,12 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
     return out;
 }
 
-Color3* get_color_iterative(Scene *self, Ray *r, Color3 *out) {
-    static float *alpha_stack = NULL;
-    static int *back_stack = NULL;
-    static int *depth_stack = NULL;
-    static float *ior_stack = NULL;
-    static Color3 **attenuation_stack = NULL;
-    static SDFInstance **instance_stack = NULL;
-    static Vector3 **normal_stack = NULL;
-    static Vector3 **position_stack = NULL;
-    static Ray **ray_stack = NULL;
-    static Color3 *temp_c = NULL;
-    static SDFInstance *temp_i = NULL;
-    static Vector3 *temp_v = NULL;
-    //static Color3 *light_color = NULL;
-    static Vector3 *perturbed_position = NULL;
-    if (!ior_stack) {   //Initialize static temp variables
-        int stack_size = pow(SCENE_RECURSION_DEPTH, 3);
-        assert((alpha_stack = malloc(sizeof(float) * stack_size)));
-        assert((back_stack = malloc(sizeof(int) * stack_size)));
-        assert((depth_stack = malloc(sizeof(int) * stack_size)));
-        assert((ior_stack = malloc(sizeof(float) * stack_size)));
-        assert((attenuation_stack = malloc(sizeof(Color3 *) * stack_size)));
-        assert((instance_stack = malloc(sizeof(SDFInstance *) * stack_size)));
-        assert((normal_stack = malloc(sizeof(Vector3 *) * stack_size)));
-        assert((position_stack = malloc(sizeof(Vector3 *) * stack_size)));
-        assert((ray_stack = malloc(sizeof(Ray *) * stack_size)));
-        temp_c = color3(0, 0, 0);
-        temp_v = vector3(0, 0, 0);
-        //light_color = color3(0, 0, 0);
-        perturbed_position = vector3(0, 0, 0);
-        for (int i = 0; i < stack_size; i++) {
-            *(attenuation_stack + i) = color3(0, 0, 0);
-            *(normal_stack + i) = vector3(0, 0, 0);
-            *(position_stack + i) = vector3(0, 0, 0);
-            *(ray_stack + i) = ray(vector3(0, 0, 0), vector3(0, 0, 0));
-        }
-    }
-
-    *alpha_stack = 1;
-    *back_stack = -1;
-    *depth_stack = 1;
-    *ior_stack = is_inside_instance(self, r->origin, &temp_i) ? temp_i->material->ior : SCENE_ATMOSPHERE_IOR;
-    vec3_cpy(r->origin, (*ray_stack)->origin);
-    vec3_cpy(r->direction, (*ray_stack)->direction);
-    (*attenuation_stack)->r = 1;
-    (*attenuation_stack)->g = 1;
-    (*attenuation_stack)->b = 1;
-    col3_smul(out, 0, out);
-    int offset = 0;
-    int total = 1;
-
-    do {
-        float curr_alpha = *(alpha_stack + offset);
-        int curr_back = *(back_stack + offset);
-        int curr_depth = *(depth_stack + offset);
-        float curr_ior = *(ior_stack + offset);
-        Color3 *curr_attenuation = *(attenuation_stack);
-        Vector3 *curr_normal = *(normal_stack + offset);
-        Vector3 *curr_position = *(position_stack + offset);
-        Ray *curr_ray = *(ray_stack + offset);
-        SDFInstance *hit_instance =  (*(instance_stack + offset) = ray_march(
-            self,
-            curr_ray,
-            SCENE_MARCH_DIST_MAX,
-            curr_position
-        ));
-        if (hit_instance) {
-            get_normal(hit_instance, curr_position, curr_normal);
-            if (vec3_dot(curr_ray->direction, curr_normal) > 0) {
-                vec3_neg(curr_normal, curr_normal);
-            }
-            float next_ior = SCENE_ATMOSPHERE_IOR;
-            perturb_vector3(curr_position, vec3_neg(curr_normal, temp_v), perturbed_position);
-            if (is_inside_instance(self, perturbed_position, &temp_i)) {
-                next_ior = temp_i->material->ior;
-            }
-
-            float reflectance = hit_instance->material->reflectance;
-            float fresnel_add = fresnel(curr_ray->direction, curr_normal, curr_ior, next_ior) * (1 - reflectance);
-
-            float reflectance_alpha = curr_alpha * (reflectance + fresnel_add);
-            float transmission_alpha = curr_alpha * (1 - (reflectance + fresnel_add)) * hit_instance->material->transmission;
-            float diffuse_alpha = curr_alpha * (1 - reflectance) * (1 - hit_instance->material->transmission);
-
-            if (is_inside_instance(self, curr_ray->origin, &temp_i)) {   //Beer's Law
-                col3_mul(curr_attenuation, col3_exp(col3_smul(col3_log((*(instance_stack + curr_back))->material->color, temp_c), vec3_mag(vec3_sub(curr_position, *(position_stack + curr_back), temp_v)), temp_c), temp_c), curr_attenuation);
-            }
-
-            if (diffuse_alpha > SCENE_ALPHA_MIN) {
-                /*get_light_color(self, curr_position, curr_normal, light_color);
-                if (hit_instance->material->checker) {
-                    diffuse_alpha *= ((int)floorf(curr_position->x / 2) % 2 + (int)floorf(curr_position->y / 2) % 2 + (int)floorf(curr_position->z / 2) % 2) % 2 ? 1 : .375;
-                }*/
-                //col3_sfma(out, col3_mul(col3_mul(light_color, hit_instance->material->color, temp_c), curr_attenuation, temp_c), diffuse_alpha, out);
-                col3_sfma(out, hit_instance->material->color, diffuse_alpha, out);
-            }
-
-            if (curr_depth < SCENE_RECURSION_DEPTH) {
-                if (0 && transmission_alpha > SCENE_ALPHA_MIN) {
-                    Ray *next_ray = *(ray_stack + total);
-                    vec3_cpy(perturbed_position, next_ray->origin);
-                    *(alpha_stack + total) = transmission_alpha;
-                    *(back_stack + total) = offset;
-                    *(depth_stack + total) = curr_depth + 1;
-                    *(ior_stack + total) = next_ior;
-                    col3_cpy(curr_attenuation, *(attenuation_stack + total));
-                    if (refract_vector3(curr_ray->direction, curr_normal, curr_ior / next_ior, next_ray->direction)) {
-                        total++;
-                    }
-                }
-
-                if (reflectance_alpha > SCENE_ALPHA_MIN) {
-                    Ray *next_ray = *(ray_stack + total);
-                    *(alpha_stack + total) = reflectance_alpha;
-                    *(back_stack + total) = offset;
-                    *(depth_stack + total) = curr_depth + 1;
-                    *(ior_stack + total) = curr_ior;
-                    col3_cpy(curr_attenuation, *(attenuation_stack + total));
-                    perturb_vector3(curr_position, curr_normal, next_ray->origin);
-                    reflect_vector3(curr_ray->direction, curr_normal, next_ray->direction);
-                    total++;
-                }
-            }
-        }
-        else if (self->environment) {
-            //col3_sfma(out, col3_mul(self->environment->sample(self->environment, curr_ray->direction, temp_c), curr_attenuation, temp_c), curr_alpha, out);
-            col3_sfma(out, self->environment->sample(self->environment, curr_ray->direction, temp_c), curr_alpha, out);
-        }
-    } while (++offset < total);
-
-    return out;
-}
-
 Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out) {
     SDFInstance *temp_i;
     Color3 temp_c = {};
     Vector3 temp_v = {};
     Color3 attenuation = {1, 1, 1};
+    Color3 light_color = {};
     Vector3 position = {};
     Vector3 position_last = {};
     Vector3 position_pn = {};
@@ -310,7 +178,9 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
             &position
         );
         if (!hit_instance) {
-            col3_sfma(out, col3_mul(self->environment->sample(self->environment, &direction, &temp_c), &attenuation, &temp_c), alpha, out);
+            if (self->environment) {
+                col3_sfma(out, col3_mul(self->environment->sample(self->environment, &direction, &temp_c), &attenuation, &temp_c), alpha, out);
+            }
             break;
         }
 
@@ -325,7 +195,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
         float reflectance = mat->reflectance + fresnel_add;
         float transmission = (1 - reflectance) * mat->transmission;
-        float diffuse = (1 - mat->reflectance) * (1 - mat->transmission);
+        float diffuse = (1 - reflectance) * (1 - mat->transmission);
 
         if (diffuse < 1) {
             alpha *= 1 - diffuse;
@@ -356,10 +226,13 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         else {
             rr = 0;
         }
-        if (hit_instance->material->checker) {
-            diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+        if (diffuse > SCENE_ALPHA_MIN) {
+            if (hit_instance->material->checker) {
+                diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+            }
+            get_light_color(self, &position, &normal, &light_color);
+            col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
         }
-        col3_sfma(out, col3_mul(mat->color, &attenuation, &temp_c), diffuse * alpha, out);
     } while ((rr *= .99) > rand2(rand_state));
     return out;
 }
@@ -412,7 +285,6 @@ static inline void render_thread(SceneRenderArgs *args) {
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         temp_r
                     );
-                    //get_color_iterative(self, temp_r, temp_c);
                     get_color_monte_carlo(self, temp_r, &rand_state, temp_c);
                     col3_sfma(temp_cout, temp_c, alpha, temp_cout);
                 }
