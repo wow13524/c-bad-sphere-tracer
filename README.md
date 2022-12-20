@@ -20,23 +20,17 @@ This is a project I've been working on since I started learning C in order to ha
 Clone the repository and run `make png` to render the scene to `output.png`.
 
 ## Example Renders
-This was rendered with an incorrect implementation of refraction using a Whitted method.
-![Broken Refraction](example_outputs/output_hd.png)
+Whitted.  Diffuse, reflection, and refraction; however, no Fresnel or HDRI support.  Clamp tonemapping.
+![Fixed Refraction](example_outputs/output_whitted_hd.png)
 
-This was rendered with a corrected implementation of refraction.
-![Fixed Refraction](example_outputs/output_hd_fix.png)
+Whitted.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  Luminance tonemapping.
+![HDRI, luminance tonemapping](example_outputs/output_whitted_hdri.png)
 
-This was rendered with the provided HDRI, with luminance tonemapping.
-![HDRI, luminance tonemapping](example_outputs/output_hdri.png)
+Whitted.  Cubes in scene with rendering artifacts.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  ACES tonemapping.
+![HDRI, ACES tonemapping](example_outputs/output_whitted_aces.png)
 
-This was rendered with the provided HDRI, with ACES tonemapping.
-![HDRI, ACES tonemapping](example_outputs/output_aces.png)
+Whitted.  Cubes in scene with rendering artifacts.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  ACES tonemapping.  Rendered in 4K.
+![HDRI, ACES tonemapping, 4k](example_outputs/output_whitted_4k.png)
 
-This was rendered with the provided HDRI, with ACES tonemapping in 4k.
-![HDRI, ACES tonemapping, 4k](example_outputs/output_4k.png)
-
-This was rendered with the provided HDRI, with ACES tonemapping in 4k using the Monte Carlo method, but with a bad implementation of Fresnel reflection and without lighting calculations.
-![HDRI, ACES tonemapping, 4k](example_outputs/output_mc_badfresnel_nolighting.png)
-
-This was rendered with the provided HDRI, with ACES tonemapping in 4k using the Monte Carlo method, but with all features implemented correctly with 1024 samples-per-pixel.
+Monte Carlo with 1024 samples-per-pixel.  Cubes in scene.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  Reflect if ray cannot be refracted.  ACES tonemapping.
 ![HDRI, ACES tonemapping, 4k](example_outputs/output_mc_1024spp.png)
