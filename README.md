@@ -21,16 +21,16 @@ Clone the repository and run `make png` to render the scene to `output.png`.
 
 ## Example Renders
 Whitted.  Diffuse, reflection, and refraction; however, no Fresnel or HDRI support.  Clamp tonemapping.
-![Fixed Refraction](example_outputs/output_whitted_hd.png)
+![Whitted, no fresnel or HDRI, clamp tonemapping](example_outputs/output_whitted_hd.png)
 
 Whitted.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  Luminance tonemapping.
-![HDRI, luminance tonemapping](example_outputs/output_whitted_hdri.png)
+![Whitted, luminance tonemapping](example_outputs/output_whitted_hdri.png)
 
 Whitted.  Cubes in scene with rendering artifacts.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  ACES tonemapping.
-![HDRI, ACES tonemapping](example_outputs/output_whitted_aces.png)
+![Whitted, cubes, ACES tonemapping](example_outputs/output_whitted_aces.png)
 
 Whitted.  Cubes in scene with rendering artifacts.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  ACES tonemapping.  Rendered in 4K.
-![HDRI, ACES tonemapping, 4k](example_outputs/output_whitted_4k.png)
+![Whitted, cubes, ACES tonemapping, 4K](example_outputs/output_whitted_4k.png)
 
 Monte Carlo with 1024 samples-per-pixel.  Cubes in scene.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  Reflect if ray cannot be refracted.  ACES tonemapping.
-![HDRI, ACES tonemapping, 4k](example_outputs/output_mc_1024spp.png)
+![Monte Carlo 1024spp, cubes, ACES tonemapping](example_outputs/output_mc_1024spp.png)
