@@ -8,11 +8,13 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#define DOF_DISTANCE 5
+#define DOF_RADIUS 0.075
 #define EPSILON .0001
 
 typedef struct Camera {
     Instance *instance;
-    Ray* (*get_ray)(struct Camera *self, float u, float v, Ray *out);
+    Ray* (*get_ray)(struct Camera *self, float u, float v, void *rand_state, Ray *out);
     float size_x;
     float size_y;
 } Camera;

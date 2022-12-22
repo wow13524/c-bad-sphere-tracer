@@ -283,6 +283,7 @@ static inline void render_thread(SceneRenderArgs *args) {
                         camera,
                         (j + (l + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_WIDTH - 1),
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
+                        &rand_state,
                         temp_r
                     );
                     get_color_monte_carlo(self, temp_r, &rand_state, temp_c);

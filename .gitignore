@@ -1,4 +1,5 @@
 output.png
+pnmtopng
 
 # Prerequisites
 *.d

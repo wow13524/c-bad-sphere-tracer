@@ -13,6 +13,6 @@ typedef struct Material {
     int checker;
 } Material;
 
-Material* material();
+extern Material *material();
 
 #endif

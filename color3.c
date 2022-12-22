@@ -1,9 +1,6 @@
 #include "color3.h"
 
-int colors = 0;
-
 Color3* color3(float r, float g, float b) {
-    colors++;
     Color3* a = malloc(sizeof(Color3));
     assert(a);
     a->r = r;

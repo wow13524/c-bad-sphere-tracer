@@ -1,4 +1,16 @@
 # if you type 'make' without arguments, this is the default
+NETPBM_CONFIG_OVERRIDE = "DEFAULT_TARGET = nonmerge\n\
+NETPBMLIBTYPE=unixstatic\n\
+NETPBMLIBSUFFIX=a\n\
+STATICLIB_TOO=N\n\
+CFLAGS = -O3 -ffast-math  -pedantic -fno-common -Wall -Wno-uninitialized -Wmissing-declarations -Wimplicit -Wwrite-strings -Wmissing-prototypes -Wundef -Wno-unknown-pragmas\n\
+CFLAGS_MERGE = -Wno-missing-declarations -Wno-missing-prototypes\n\
+LDRELOC = ld --reloc\n\
+LINKER_CAN_DO_EXPLICIT_LIBRARY=Y\n\
+LINKERISCOMPILER = Y\n\
+LEX=\n\
+CFLAGS_SHLIB += -fPIC"
+NETPBM_SRC = https://sourceforge.net/projects/netpbm/files/latest/download
 PROG    = draw
 all:    $(PROG)
 
@@ -16,13 +28,19 @@ DEBUG	=
 CSTD	=
 WARN	= -Wall -Wextra -Werror
 CDEFS	=
-CFLAGS	= -Ofast -lm -pthread -march=armv8-a+crc+nocrypto -mfloat-abi=hard -mfpu=fp-armv8 -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
+CFLAGS	= -Ofast -I. $(DEBUG) $(WARN) $(CSTD) $(CDEFS)
 
 $(OBJ):	$(HEAD)
 
 # specify how to compile the target
 $(PROG):	$(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@
+	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@ -lm -pthread
+
+pnmtopng:
+	mkdir netpbm
+	curl -s -L $(NETPBM_SRC) | tar --directory=netpbm --strip-components=1 -xz
+	cd netpbm && cp config.mk.in config.mk && echo $(NETPBM_CONFIG_OVERRIDE) >> config.mk && echo '' > configure && cd converter/other && make -s pnmtopng --keep-going && mv pnmtopng ../../../pnmtopng
+	rm -rf netpbm.tar netpbm
 
 clean:
 	rm -f $(OBJ) $(PROG)
@@ -31,6 +49,6 @@ timepng:
 	make
 	bash -c 'time make png'
 
-png:
+png: pnmtopng
 	make
 	./draw | ./pnmtopng > output.png
