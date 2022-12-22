@@ -10,6 +10,6 @@ typedef struct Instance {
     Vector3 *size;
 } Instance;
 
-Instance* instance();
+extern Instance *instance();
 
 #endif

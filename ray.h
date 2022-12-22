@@ -10,6 +10,6 @@ typedef struct Ray {
     Vector3* direction;
 } Ray;
 
-Ray* ray(Vector3 *origin, Vector3 *direction);
+extern Ray *ray(Vector3 *origin, Vector3 *direction);
 
 #endif
