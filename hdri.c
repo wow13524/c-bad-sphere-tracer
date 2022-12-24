@@ -3,7 +3,7 @@
 static inline unsigned char rle_get_buf_byte(FILE *stream, unsigned char *buf, unsigned int *pos) {
     if (*pos >= READ_BUF_SIZE) {
         *pos -= READ_BUF_SIZE;
-        fread(buf, READ_BUF_SIZE, 1, stream);
+        (void)!fread(buf, READ_BUF_SIZE, 1, stream);
     }
     return *(buf + (*pos)++);
 }
@@ -72,8 +72,8 @@ Hdri* hdri(char *filename) {
         return NULL;
     }
 
-    fgetc(file);    //blank line
-    fgets(buf, READ_BUF_SIZE, file);    //load dimension info
+    (void)!fgetc(file);    //blank line
+    (void)!fgets(buf, READ_BUF_SIZE, file);    //load dimension info
     char *endptr;
 
     //get size of hdr

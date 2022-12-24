@@ -18,6 +18,6 @@ typedef struct Hdri {
     Color3* (*sample)(struct Hdri *self, Vector3 *direction, Color3 *out);
 } Hdri;
 
-Hdri* hdri(char *filename);
+extern Hdri *hdri(char *filename);
 
 #endif

@@ -121,7 +121,6 @@ Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-//TODO take instance transmission into account
 Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
     Vector3 temp_v = (Vector3){};
     Vector3 origin = (Vector3){};
@@ -283,6 +282,7 @@ static inline void render_thread(SceneRenderArgs *args) {
                         camera,
                         (j + (l + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_WIDTH - 1),
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
+                        &rand_state,
                         temp_r
                     );
                     get_color_monte_carlo(self, temp_r, &rand_state, temp_c);

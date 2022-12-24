@@ -20,8 +20,8 @@
 #define SCENE_MARCH_ITER_MAX 2048
 #define SCENE_OUTPUT_HEIGHT 1080
 #define SCENE_OUTPUT_WIDTH 1920
-#define SCENE_OUTPUT_SAMPLES 32
-#define SCENE_RENDER_THREADS 4
+#define SCENE_OUTPUT_SAMPLES 8
+#define SCENE_RENDER_THREADS 48
 
 typedef struct Scene {
     int instance_count;
@@ -42,6 +42,6 @@ typedef struct SceneRenderArgs {
     int *line_cnt;
 } SceneRenderArgs;
 
-Scene* scene();
+extern Scene *scene();
 
 #endif

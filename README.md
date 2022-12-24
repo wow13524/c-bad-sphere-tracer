@@ -34,3 +34,6 @@ Whitted.  Cubes in scene with rendering artifacts.  Diffuse, reflection, and ref
 
 Monte Carlo with 1024 samples-per-pixel.  Cubes in scene.  Diffuse, reflection, and refraction with Fresnel and HDRI support.  Reflect if ray cannot be refracted.  ACES tonemapping.
 ![Monte Carlo 1024spp, cubes, ACES tonemapping](example_outputs/output_mc_1024spp.png)
+
+Monte Carlo with 65536 samples-per-pixel.  Same as above, but with depth of field and bokeh effect.  ACES tonemapping.
+![Monte Carlo 1024spp, cubes, ACES tonemapping](example_outputs/output_mc_dof.png)
