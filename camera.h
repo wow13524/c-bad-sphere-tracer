@@ -8,8 +8,13 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+<<<<<<< Updated upstream
 #define DOF_DISTANCE 5
 #define DOF_RADIUS 0.075
+=======
+#define DOF_DISTANCE 10
+#define DOF_RADIUS 0.25
+>>>>>>> Stashed changes
 #define EPSILON .0001
 
 typedef struct Camera {

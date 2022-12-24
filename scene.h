@@ -20,7 +20,11 @@
 #define SCENE_MARCH_ITER_MAX 2048
 #define SCENE_OUTPUT_HEIGHT 1080
 #define SCENE_OUTPUT_WIDTH 1920
+<<<<<<< Updated upstream
 #define SCENE_OUTPUT_SAMPLES 128
+=======
+#define SCENE_OUTPUT_SAMPLES 8
+>>>>>>> Stashed changes
 #define SCENE_RENDER_THREADS 48
 
 typedef struct Scene {

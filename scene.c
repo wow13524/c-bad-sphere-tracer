@@ -121,7 +121,6 @@ Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-//TODO take instance transmission into account
 Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
     Vector3 temp_v = (Vector3){};
     Vector3 origin = (Vector3){};
