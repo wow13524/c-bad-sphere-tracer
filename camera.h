@@ -9,8 +9,13 @@
 #define CAMERA_H
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 #define DOF_DISTANCE 5
 #define DOF_RADIUS 0.075
+=======
+#define DOF_DISTANCE 10
+#define DOF_RADIUS 0.25
+>>>>>>> Stashed changes
 =======
 #define DOF_DISTANCE 10
 #define DOF_RADIUS 0.25
