@@ -8,7 +8,7 @@ Camera* abstract_camera() {
 }
 
 Ray* get_ray(Camera *self, float u, float v, void *rand_state, Ray *out) {
-    Vector3 focal_target = {};
+    Vector3 focal_target;
     float dof_r = sqrt((float)rand_r(rand_state) / RAND_MAX) * DOF_RADIUS;
     float dof_theta = 2 * M_PI * ((float)rand_r(rand_state) / RAND_MAX);
     float dof_u = dof_r * cosf(dof_theta);

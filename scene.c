@@ -16,7 +16,7 @@ void add_light(Scene *self, Light *light) {
 
 float map(Scene *self, Vector3 *position, SDFInstance **out) {
     *out = *self->instances;
-    register float closest_distance = (*out)->get_distance(*out, position);
+    float closest_distance = (*out)->get_distance(*out, position);
     for (int j = 1; j < self->instance_count; j++) {
         SDFInstance *instance = *(self->instances + j);
         float distance = instance->get_distance(instance, position);
@@ -50,7 +50,10 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
     for (int i = 0; i < SCENE_MARCH_ITER_MAX; i++) {
         float radius = direction * map(self, out, &result);
         float abs_radius = fabsf(radius);
-        if (backtracked) {
+        if (abs_radius < EPSILON) {
+            break;
+        }
+        else if (backtracked) {
             next_step = radius;
         }
         else if (omega * last_radius > last_radius + abs_radius) {
@@ -62,11 +65,8 @@ SDFInstance* ray_march(Scene *self, Ray *r, float t_max, Vector3 *out) {
             next_step = omega * radius;
         }
         total_distance += next_step;
-         if (total_distance > t_max) {
+        if (total_distance > t_max) {
             result = NULL;
-            break;
-        }
-        if (abs_radius < EPSILON) {
             break;
         }
         vec3_fma(r->origin, r->direction, total_distance, out);
@@ -83,18 +83,12 @@ Vector3* reflect_vector3(Vector3 *direction, Vector3 *normal, Vector3 *out) {
 }
 
 Vector3* refract_vector3(Vector3 *direction, Vector3 *normal, float r, Vector3 *out) {
-    Vector3 temp_v = (Vector3){};
-    float c = vec3_dot(normal, direction);
+    float c = vec3_dot(direction, normal);
     float s =  1 - r * r * (1 - c * c);
     if (s < 0) {
         return NULL;
     } 
-    else if(c > 0) {    //Correct for when ray is leaving an object
-        return vec3_fma(vec3_mul(direction, r, &temp_v), normal, -r * c + sqrtf(s), out);
-    }
-    else {
-        return vec3_fma(vec3_mul(direction, r, &temp_v), normal, -r * c - sqrtf(s), out);
-    }
+    return vec3_fma(vec3_mul(direction, r, out), normal, -r * c + (c > 0 ? sqrtf(s) : -sqrtf(s)), out);
 }
 
 float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) {
@@ -105,8 +99,8 @@ float fresnel(Vector3 *direction, Vector3 *normal, float ior_in, float ior_out) 
     
 }
 
-float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
-    Vector3 temp_v = {};
+static inline float get_distance_axis(SDFInstance *instance, Vector3 *position, Vector3 *axis) {
+    Vector3 temp_v;
     return instance->get_distance(instance, vec3_add(position, axis, &temp_v))
          - instance->get_distance(instance, vec3_sub(position, axis, &temp_v));
 }
@@ -122,16 +116,13 @@ Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
 }
 
 Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
-    Vector3 temp_v = (Vector3){};
-    Vector3 origin = (Vector3){};
-    Vector3 direction = (Vector3){};
-    Ray temp_r = (Ray){&origin, &direction};
+    Vector3 temp_v, origin, direction;
+    Ray temp_r = {&origin, &direction};
     perturb_vector3(position, normal, &origin);
     col3_smul(out, 0, out);
-    register Light **lights = self->lights;
     register int light_count = self->light_count;
     for (int i = 0; i < light_count; i++) {
-        Light *l = *(lights + i);
+        Light *l = *(self->lights + i);
         Vector3 *offset = vec3_sub(l->instance->position, position, &direction);
         int is_visible = l->visibility == ALWAYS_VISIBLE;
         if (!is_visible) {
@@ -237,8 +228,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
 }
 
 Color3* tonemap(Color3 *a, Color3 *out) {
-    Color3 temp_c1 = (Color3){};
-    Color3 temp_c2 = (Color3){};
+    Color3 temp_c1, temp_c2;
 
     out->r = 0.59719 * a->r + 0.35458 * a->g + 0.04823 * a->b;
     out->g = 0.07600 * a->r + 0.90834 * a->g + 0.01566 * a->b;
@@ -252,8 +242,7 @@ Color3* tonemap(Color3 *a, Color3 *out) {
     out->g = -0.10208 * temp_c1.r + 1.10813 * temp_c1.g - 0.00605 * temp_c1.b;
     out->b = -0.00327 * temp_c1.r - 0.07276 * temp_c1.g + 1.07602 * temp_c1.b;
 
-    col3_clamp(out, out);
-    col3_spow(out, 1 / 2.2, out);
+    col3_spow(col3_clamp(out, out), 1 / 2.2, out);
     return out;
 }
 
@@ -265,17 +254,15 @@ static inline void render_thread(SceneRenderArgs *args) {
     int *line_cnt = args->line_cnt;
     unsigned int rand_state = thread_i;
 
-    Color3 *temp_c = color3(0, 0, 0);
-    Color3 *temp_cout = color3(0, 0, 0);
-    Vector3 *temp_v1 = vector3(0, 0, 0);
-    Vector3 *temp_v2 = vector3(0, 0, 0);
-    Ray *temp_r = ray(temp_v1, temp_v2);
+    Color3 temp_c, temp_cout;
+    Vector3 temp_v1, temp_v2;
+    Ray temp_r = {&temp_v1, &temp_v2};
     float alpha = 1. / (SCENE_OUTPUT_SAMPLES * SCENE_OUTPUT_SAMPLES);
 
     int i;
     while ((i = (*line_cnt)++) < SCENE_OUTPUT_HEIGHT) {
         for (int j = 0; j < SCENE_OUTPUT_WIDTH; j++) {
-            temp_cout = col3_smul(temp_cout, 0, temp_cout);
+            temp_cout = (Color3){0, 0, 0};
             for (int k = 0; k < SCENE_OUTPUT_SAMPLES; k++) {
                 for (int l = 0; l < SCENE_OUTPUT_SAMPLES; l++) {
                     camera->get_ray(
@@ -283,20 +270,15 @@ static inline void render_thread(SceneRenderArgs *args) {
                         (j + (l + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_WIDTH - 1),
                         (i + (k + .5) / SCENE_OUTPUT_SAMPLES) / (SCENE_OUTPUT_HEIGHT - 1),
                         &rand_state,
-                        temp_r
+                        &temp_r
                     );
-                    get_color_monte_carlo(self, temp_r, &rand_state, temp_c);
-                    col3_sfma(temp_cout, temp_c, alpha, temp_cout);
+                    get_color_monte_carlo(self, &temp_r, &rand_state, &temp_c);
+                    col3_sfma(&temp_cout, &temp_c, alpha, &temp_cout);
                 }
             }
-            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(temp_cout, temp_cout));
+            *(output + SCENE_OUTPUT_WIDTH * i + j) = col3_to_int(tonemap(&temp_cout, &temp_cout));
         }
     }
-    free(temp_c);
-    free(temp_cout);
-    free(temp_r);
-    free(temp_v1);
-    free(temp_v2);
 }
 
 unsigned int* render(Scene *self, Camera *camera) {

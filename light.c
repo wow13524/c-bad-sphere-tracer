@@ -16,9 +16,8 @@ float brightness_ambient_light(Light *self, Vector3 *position) {
 }
 
 float brightness_point_light(Light *self, Vector3 *position) {
-    Vector3 temp = (Vector3){};
-    return self->instance->size->x
-        / vec3_mag2(vec3_sub(self->instance->position, position, &temp));
+    Vector3 temp_v;
+    return self->instance->size->x / vec3_mag2(vec3_sub(self->instance->position, position, &temp_v));
 }
 
 brightness_function_t ambient_light = brightness_ambient_light;

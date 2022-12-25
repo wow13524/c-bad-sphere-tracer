@@ -10,8 +10,7 @@ SDFInstance* sdf_instance(distance_function_t distance_function) {
 }
 
 float distance_cube(SDFInstance *self, Vector3 *position) {
-    Vector3 temp_v1 = {};
-    Vector3 temp_v2 = {};
+    Vector3 temp_v1, temp_v2;
     vec3_sub(self->instance->position, position, &temp_v1);
     vec3_abs(&temp_v1, &temp_v1);
     vec3_div(self->instance->size, 2, &temp_v2);
@@ -30,7 +29,7 @@ float distance_plane(SDFInstance *self, Vector3 *position) {
 }
 
 float distance_sphere(SDFInstance *self, Vector3 *position) {
-    Vector3 temp_v = {};
+    Vector3 temp_v;
     return vec3_mag(vec3_sub(self->instance->position, position, &temp_v)) - self->instance->size->x / 2;
 }
 
