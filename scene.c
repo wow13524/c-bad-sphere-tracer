@@ -143,17 +143,9 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
 
 Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out) {
     SDFInstance *temp_i;
-    Color3 temp_c = {};
-    Vector3 temp_v = {};
     Color3 attenuation = {1, 1, 1};
-    Color3 light_color = {};
-    Vector3 position = {};
-    Vector3 position_last = {};
-    Vector3 position_pn = {};
-    Vector3 normal = {};
-    Vector3 normal_neg = {};
-    Vector3 origin = {};
-    Vector3 direction = {};
+    Color3 temp_c, light_color;
+    Vector3 temp_v, position, position_last, position_pn, normal, normal_neg, origin, direction;
     Ray cr = {vec3_cpy(r->origin, &origin), vec3_cpy(r->direction, &direction)};
     float alpha = 1;
     float rr = 1;
