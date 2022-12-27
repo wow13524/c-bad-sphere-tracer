@@ -10,28 +10,10 @@ int main(void) {
     Hdri *environment = hdri("clarens_night_02_4k.hdr");
     //return EXIT_SUCCESS;
 
-    Light *ambient = light(ambient_light, ALWAYS_VISIBLE);
-    ambient->instance->size = vector3(.375, 0, 0);
-
-    Light *point_light_a = light(point_light, LINE_OF_SIGHT);
-    point_light_a->instance->position = vector3(-2, 4, 0);
-    point_light_a->instance->size = vector3(32, 0, 0);
-    point_light_a->color = color3(1, .5, 1);
-
-    Light *point_light_b = light(point_light, LINE_OF_SIGHT);
-    point_light_b->instance->position = vector3(4, 1, 3);
-    point_light_b->instance->size = vector3(16, 0, 0);
-    point_light_b->color = color3(.5, 1, 1);
-
-    Light *point_light_c = light(point_light, LINE_OF_SIGHT);
-    point_light_c->instance->position = vector3(2.5, 1.25, 10);
-    point_light_c->instance->size = vector3(48, 0, 0);
-    point_light_c->color = color3(1, 1, .5);
-
     SDFInstance *ground_plane = sdf_instance(plane);
     ground_plane->instance->position = vector3(0, -2.501, 0);
     ground_plane->material->color = color3(1, .8, .8);
-    ground_plane->material->reflectance = .25;
+    ground_plane->material->roughness = .5;
     ground_plane->material->checker = 1;
 
     SDFInstance *sphere_a = sdf_instance(sphere);
@@ -39,32 +21,62 @@ int main(void) {
     sphere_a->instance->size = vector3(5, 5, 5);
     sphere_a->material->color = color3(.8, .8, 1);
     sphere_a->material->ior = 1.125;
-    sphere_a->material->reflectance = .1;
+    sphere_a->material->roughness = .1;
     sphere_a->material->transmission = 1;
 
-    SDFInstance *sphere_b = sdf_instance(cube);
-    sphere_b->instance->position = vector3(5, -.5, 8);
-    sphere_b->instance->size = vector3(4, 4, 4);
-    sphere_b->material->color = color3(.8, 1, .8);
-    sphere_b->material->ior = 1.25;
-    sphere_b->material->reflectance = .1;
+    SDFInstance *sphere_b = sdf_instance(sphere);
+    sphere_b->instance->position = vector3(-3.75, 2.5, 12.5);
+    sphere_b->instance->size = vector3(10, 10, 10);
+    sphere_b->material->color = color3(.5, .8, .8);
+    sphere_b->material->ior = 2;
+    sphere_b->material->roughness = .15;
     sphere_b->material->transmission = 1;
 
-    SDFInstance *sphere_c = sdf_instance(cube);
-    sphere_c->instance->position = vector3(-2, 1, 2.5);
-    sphere_c->instance->size = vector3(1, 1, 1);
-    sphere_c->material->color = color3(.8, 0, .8);
-    sphere_c->material->ior = 1.5;
-    sphere_c->material->reflectance = .1;
-    sphere_c->material->transmission = 1;
+    SDFInstance *cube_a = sdf_instance(cube);
+    cube_a->instance->position = vector3(5, -.5, 8);
+    cube_a->instance->size = vector3(4, 4, 4);
+    cube_a->material->color = color3(.8, 1, .8);
+    cube_a->material->ior = 1.25;
+    cube_a->material->roughness = .2;
+    cube_a->material->transmission = 1;
 
-    SDFInstance *sphere_d = sdf_instance(sphere);
-    sphere_d->instance->position = vector3(-3.75, 2.5, 12.5);
-    sphere_d->instance->size = vector3(10, 10, 10);
-    sphere_d->material->color = color3(.5, .8, .8);
-    sphere_d->material->ior = 2;
-    sphere_d->material->reflectance = .1;
-    sphere_d->material->transmission = 1;
+    SDFInstance *cube_b = sdf_instance(cube);
+    cube_b->instance->position = vector3(-2, 1, 2.5);
+    cube_b->instance->size = vector3(.75, .75, .75);
+    cube_b->material->color = color3(.8, 0, .8);
+    cube_b->material->ior = 1.5;
+    cube_b->material->roughness = .25;
+    cube_b->material->transmission = 1;
+
+    SDFInstance *wall_left = sdf_instance(cube);
+    wall_left->instance->position = vector3(-10, 5, 10);
+    wall_left->instance->size = vector3(1, 20, 25);
+    wall_left->material->color = color3(.5, .8, .8);
+    wall_left->material->roughness = .5;
+
+    SDFInstance *wall_right = sdf_instance(cube);
+    wall_right->instance->position = vector3(10, 5, 10);
+    wall_right->instance->size = vector3(1, 20, 25);
+    wall_right->material->color = color3(.8, .5, .8);
+    wall_right->material->roughness = .5;
+
+    SDFInstance *wall_back = sdf_instance(cube);
+    wall_back->instance->position = vector3(0, 5, -2.5);
+    wall_back->instance->size = vector3(20, 20, 1);
+    wall_back->material->color = color3(.8, .8, .5);
+    wall_back->material->roughness = .5;
+
+    SDFInstance *wall_front = sdf_instance(cube);
+    wall_front->instance->position = vector3(0, 5, 22.5);
+    wall_front->instance->size = vector3(20, 20, 1);
+    wall_front->material->color = color3(.5, .8, .5);
+    wall_front->material->roughness = .5;
+
+    SDFInstance *wall_top = sdf_instance(cube);
+    wall_top->instance->position = vector3(0, 15, 10);
+    wall_top->instance->size = vector3(20, 1, 25);
+    wall_top->material->color = color3(.8, .5, .5);
+    wall_top->material->roughness = .5;
 
     Camera *cam = perspective_camera(70 * M_PI / 180, 16. / 9.);
 
@@ -73,12 +85,13 @@ int main(void) {
     s->add_instance(s, ground_plane);
     s->add_instance(s, sphere_a);
     s->add_instance(s, sphere_b);
-    s->add_instance(s, sphere_c);
-    s->add_instance(s, sphere_d);
-    s->add_light(s, ambient);
-    s->add_light(s, point_light_a);
-    s->add_light(s, point_light_b);
-    s->add_light(s, point_light_c);
+    s->add_instance(s, cube_a);
+    s->add_instance(s, cube_b);
+    s->add_instance(s, wall_left);
+    s->add_instance(s, wall_right);
+    //s->add_instance(s, wall_back);
+    s->add_instance(s, wall_front);
+    s->add_instance(s, wall_top);
 
     render_to_ppm(s->render(s, cam));
 

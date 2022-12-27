@@ -5,7 +5,7 @@ Material* material() {
     assert(x);
     x->color = color3(.8, .8, .8);
     x->ior = 1;
-    x->reflectance = 0;
+    x->roughness = 0;
     x->transmission = 0;
 
     x->checker = 0;

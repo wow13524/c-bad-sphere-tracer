@@ -8,7 +8,7 @@
 typedef struct Material {
     Color3 *color;
     float ior;
-    float reflectance;
+    float roughness;
     float transmission;
     int checker;
 } Material;
