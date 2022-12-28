@@ -1,5 +1,9 @@
 #include "scene.h"
 
+static inline int is_positive(float a) {
+    return a > 0;
+}
+
 static inline float rand2(void *state) {
     return (float)rand_r(state) / RAND_MAX;
 }
@@ -138,6 +142,44 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
             col3_sfma(out, l->color, local_brightness, out);
         }
     }
+    return out;
+}
+
+static inline float ggx_theta(float roughness, void *rand_state) {
+    float r = rand2(rand_state);
+    return atanf(roughness * sqrtf(r) / sqrtf(1 - r));
+}
+
+static inline float ggx_ndf(Vector3 *normal, Vector3 *m, float roughness, float theta) {
+    roughness *= roughness;
+    float c = cosf(theta);
+    c *= c;
+    c *= c;
+    float d = tanf(theta);
+    d *= d;
+    d += roughness;
+    d *= d;
+    return roughness * is_positive(vec3_dot(normal, m)) / (M_PI * c * d);
+}
+
+static inline float ggx_masking(Vector3 *normal, Vector3 *m, Vector3 *v, float roughness, float theta) {
+    float c = roughness + tanf(theta);
+    return 2 * is_positive(vec3_dot(v, m) / vec3_dot(v, normal)) / (1 + sqrt(1 + c * c));
+}
+
+static inline Vector3 *ggx_bsdf(Vector3 *normal, float theta, void *rand_state, Vector3 *out) {
+    Vector3 look = {0, 0, 1};
+    Vector3 right;
+    if (1 - fabsf(vec3_dot(&look, normal)) < EPSILON) {
+        look = (Vector3){1, 0, 0};
+    }
+    vec3_unit(vec3_cross(normal, &look, &right), &right);
+    vec3_cross(normal, &right, &look);
+    float phi = 2 * M_PI * rand2(rand_state);
+    float sin_theta = sinf(theta);
+    vec3_mul(normal, cosf(theta), out);
+    vec3_fma(out, &look, sin_theta * sinf(phi), out);
+    vec3_fma(out, &right, sin_theta * cosf(phi), out);
     return out;
 }
 
