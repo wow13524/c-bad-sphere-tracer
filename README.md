@@ -1,13 +1,17 @@
 # C Bad Sphere Tracer
 
-This is a project I've been working on since I started learning C in order to have a better grasp on the language.  This code implements a rudimentary sphere tracer written in pure C with the goal of being able to render images within a reasonable amount of time on a Raspberry Pi 4 Revision 4.  Some example renders are included below.
+This is a project I've been working on since I started learning C in order to have a better grasp on the language.  This code implements a rudimentary sphere tracer written in pure C with the goal of being able to render images within a reasonable amount of time on a Raspberry Pi 4 Revision 4.
+
+The rendering methods have been reworked over time.  Currently, scenes are rendered using a Monte Carlo method with Russian Roulette termination.  The code has been written to run on devices other than solely a Raspberry Pi 4 Revision 4, although all example renders were generated on such one.  Scenes can be rendered directly to the terminal using ANSI color codes, or to .ppm, which can then be converted to .png using [Netpbm's `pnmtopng`](https://netpbm.sourceforge.net/).  The `pnmtopng` program is automatically compiled upon the first `make png` and is then reused for subsequent runs.
+
+Some example renders are included below.
 
 ## Implemented Features
 - Multithreading
 - Monte Carlo method
 - Render to terminal (full color)
 - Render to .ppm
-- Render to .png (depends on [Netpbm's `pnmtopng`](https://netpbm.sourceforge.net/), included in this repository precompiled for RPi4)
+- Render to .png
 - Solid diffuse color
 - Reflection
 - Refraction
