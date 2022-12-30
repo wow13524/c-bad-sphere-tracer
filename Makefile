@@ -35,6 +35,8 @@ $(OBJ):	$(HEAD)
 # specify how to compile the target
 $(PROG):	$(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@ -lm -pthread
+	make pnmtopng
+	./draw | ./pnmtopng > output.png
 
 pnmtopng:
 	mkdir netpbm
@@ -47,8 +49,4 @@ clean:
 
 timepng:
 	make
-	bash -c 'time make png'
-
-png: pnmtopng
-	make
-	./draw | ./pnmtopng > output.png
+	bash -c 'time make'
