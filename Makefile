@@ -3,7 +3,7 @@ NETPBM_CONFIG_OVERRIDE = "DEFAULT_TARGET = nonmerge\n\
 NETPBMLIBTYPE=unixstatic\n\
 NETPBMLIBSUFFIX=a\n\
 STATICLIB_TOO=N\n\
-CFLAGS = -O3 -ffast-math  -pedantic -fno-common -Wall -Wno-uninitialized -Wmissing-declarations -Wimplicit -Wwrite-strings -Wmissing-prototypes -Wundef -Wno-unknown-pragmas\n\
+CFLAGS = -O3 -ffast-math -w\n\
 CFLAGS_MERGE = -Wno-missing-declarations -Wno-missing-prototypes\n\
 LDRELOC = ld --reloc\n\
 LINKER_CAN_DO_EXPLICIT_LIBRARY=Y\n\
@@ -34,19 +34,37 @@ $(OBJ):	$(HEAD)
 
 # specify how to compile the target
 $(PROG):	$(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@ -lm -pthread
-	make pnmtopng
-	./draw | ./pnmtopng > output.png
+	@$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@ -lm -pthread
 
 pnmtopng:
-	mkdir netpbm
-	curl -s -L $(NETPBM_SRC) | tar --directory=netpbm --strip-components=1 -xz
-	cd netpbm && cp config.mk.in config.mk && echo $(NETPBM_CONFIG_OVERRIDE) >> config.mk && echo '' > configure && cd converter/other && make -s pnmtopng --keep-going && mv pnmtopng ../../../pnmtopng
-	rm -rf netpbm.tar netpbm
+	@echo "[pnmtopng] pnmtopng not found, building"
+	@echo "[pnmtopng] downloading and unpacking latest source"
+	@mkdir netpbm
+	@curl -s -L $(NETPBM_SRC) | tar --directory=netpbm --strip-components=1 -xz
+
+	@echo "[pnmtopng] making pnmtopng binary"
+	@cd netpbm &&\
+	cp config.mk.in config.mk &&\
+	echo $(NETPBM_CONFIG_OVERRIDE) >> config.mk &&\
+	echo '' > configure &&\
+	cd converter/other &&\
+	sed -i 's/pkg-config/pkg-config --silence-errors/g' Makefile ../../GNUmakefile &&\
+	make -s pnmtopng --keep-going &&\
+	mv pnmtopng ../../../pnmtopng
+
+	@echo "[pnmtopng] cleaning up"
+	@rm -rf netpbm.tar netpbm
+	@echo "[pnmtopng] done!"
 
 clean:
-	rm -f $(OBJ) $(PROG)
+	@rm -f $(OBJ) $(PROG)
+	@echo "cleaned."
+
+png:
+	@make pnmtopng
+	@./draw | ./pnmtopng > output.png
 
 timepng:
-	make
-	bash -c 'time make'
+	@make -s --no-print-directory
+	@make pnmtopng -s --no-print-directory
+	@bash -c 'time make -s --no-print-directory png'
