@@ -14,6 +14,17 @@ typedef struct Vector3 {
 
 extern Vector3 *vector3(float x, float y, float z);
 
+const Vector3 *X_AXIS = &(Vector3){1, 0, 0};
+const Vector3 *Y_AXIS = &(Vector3){0, 1, 0};
+const Vector3 *Z_AXIS = &(Vector3){0, 0, 1};
+
+__attribute__((always_inline)) inline Vector3 *vec3_cross(Vector3 *a, Vector3 *b, Vector3 *out) {
+    out->x = a->y * b->z - b->y * a->z;
+    out->y = a->z * b->x - b->z * a->x;
+    out->z = a->x * b->y - b->x * a->y;
+    return out;
+}
+
 __attribute__((always_inline)) inline float vec3_dot(Vector3 *a, Vector3 *b) {
     return a->x * b->x + a->y * b->y + a->z * b->z;
 }
@@ -82,6 +93,10 @@ __attribute__((always_inline)) inline Vector3 *vec3_div(Vector3 *a, float c, Vec
 
 __attribute__((always_inline)) inline Vector3 *vec3_unit(Vector3 *a, Vector3 *out) {
     return vec3_div(a, vec3_mag(a), out);
+}
+
+__attribute__((always_inline)) inline Vector3 *vec3_proj(Vector3 *a, Vector3 *b, Vector3 *out) {
+    return vec3_mul(b, vec3_dot(a, b) / vec3_mag2(b), out);
 }
 
 #endif
