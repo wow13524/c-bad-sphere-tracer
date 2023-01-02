@@ -14,9 +14,9 @@ typedef struct Vector3 {
 
 extern Vector3 *vector3(float x, float y, float z);
 
-const Vector3 *X_AXIS = &(Vector3){1, 0, 0};
-const Vector3 *Y_AXIS = &(Vector3){0, 1, 0};
-const Vector3 *Z_AXIS = &(Vector3){0, 0, 1};
+extern Vector3 *X_AXIS;
+extern Vector3 *Y_AXIS;
+extern Vector3 *Z_AXIS;
 
 __attribute__((always_inline)) inline Vector3 *vec3_cross(Vector3 *a, Vector3 *b, Vector3 *out) {
     out->x = a->y * b->z - b->y * a->z;
