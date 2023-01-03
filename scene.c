@@ -119,7 +119,51 @@ Vector3 *get_normal(SDFInstance *instance, Vector3 *position, Vector3 *out) {
     return vec3_unit(out, out);
 }
 
-Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 *out) {
+//Simple exact GGX VNDF sampling: https://hal.archives-ouvertes.fr/hal-01509746/document
+static inline Vector3 *ggx_vndf(Vector3 *normal, Vector3 *direction, float roughness, void *rand_state, Vector3 *out) {
+    //Convert direction from world to local with normal as up vector
+    Vector3 normal_basis_x, normal_basis_y, local_basis_z, local_normal;
+    Vector3 local = {
+        roughness * vec3_mag(vec3_sub(direction, vec3_proj(direction, normal, &normal_basis_x), &normal_basis_x)),
+        0,
+        -vec3_dot(normal, direction) / vec3_mag2(normal)
+    };
+
+    if (vec3_mag2(&normal_basis_x) < EPSILON) { //Correct for when normal and direction are parallel
+         vec3_cross(normal, 1 - fabsf(normal->z) > EPSILON  ? Z_AXIS : X_AXIS, &normal_basis_x);
+    }
+
+    vec3_unit(&local, &local);
+    vec3_unit(&normal_basis_x, &normal_basis_x);
+    vec3_cross(normal, &normal_basis_x, &normal_basis_y);
+    vec3_cross(&local, Y_AXIS, &local_basis_z);
+
+    //sample both hemispheres to derive random normal in local space
+    float a = 1 / (1 + local.z);
+    float r = sqrt(rand2(rand_state));
+    float r2 = rand2(rand_state);
+    float phi = r2 < a ? r2 / a * M_PI : M_PI + (r2 - a) / (1 - a) * M_PI;
+    float p1 = r * cosf(phi);
+    float p2 = r * sinf(phi) * (r2 < a ? 1 : local.z);
+
+    vec3_mul(Y_AXIS, p1, &local_normal);
+    vec3_fma(&local_normal, &local_basis_z, p2, &local_normal);
+    vec3_fma(&local_normal, &local, sqrtf(1 - p1 * p1 - p2 * p2), &local_normal);
+
+    local_normal.x *= roughness;
+    local_normal.y *= roughness;
+    vec3_unit(&local_normal, &local_normal);
+
+    //Convert local random normal back to world space
+    vec3_mul(normal, local_normal.z, out);
+    vec3_fma(out, &normal_basis_x, local_normal.x, out);
+    vec3_fma(out, &normal_basis_y, local_normal.y, out);
+
+    return out;
+}
+
+Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, void *rand_state, Color3 *out) {
+    Color3 temp_c;
     Vector3 temp_v, origin, direction;
     Ray temp_r = {&origin, &direction};
     perturb_vector3(position, normal, &origin);
@@ -142,44 +186,12 @@ Color3* get_light_color(Scene *self, Vector3 *position, Vector3 *normal, Color3 
             col3_sfma(out, l->color, local_brightness, out);
         }
     }
-    return out;
-}
-
-static inline float ggx_theta(float roughness, void *rand_state) {
-    float r = rand2(rand_state);
-    return atanf(roughness * sqrtf(r) / sqrtf(1 - r));
-}
-
-static inline float ggx_ndf(Vector3 *normal, Vector3 *m, float roughness, float theta) {
-    roughness *= roughness;
-    float c = cosf(theta);
-    c *= c;
-    c *= c;
-    float d = tanf(theta);
-    d *= d;
-    d += roughness;
-    d *= d;
-    return roughness * is_positive(vec3_dot(normal, m)) / (M_PI * c * d);
-}
-
-static inline float ggx_masking(Vector3 *normal, Vector3 *m, Vector3 *v, float roughness, float theta) {
-    float c = roughness + tanf(theta);
-    return 2 * is_positive(vec3_dot(v, m) / vec3_dot(v, normal)) / (1 + sqrt(1 + c * c));
-}
-
-static inline Vector3 *ggx_bsdf(Vector3 *normal, float theta, void *rand_state, Vector3 *out) {
-    Vector3 look = {0, 0, 1};
-    Vector3 right;
-    if (1 - fabsf(vec3_dot(&look, normal)) < EPSILON) {
-        look = (Vector3){1, 0, 0};
+    if (self->environment) {
+        ggx_vndf(normal, vec3_neg(normal, &temp_v), 1, rand_state, &direction);
+        if (ray_march(self, &temp_r, SCENE_MARCH_DIST_MAX, &temp_v) == NULL) {
+            col3_sfma(out, self->environment->sample(self->environment, &direction, &temp_c), vec3_dot(normal, &direction), out);
+        }
     }
-    vec3_unit(vec3_cross(normal, &look, &right), &right);
-    vec3_cross(normal, &right, &look);
-    float phi = 2 * M_PI * rand2(rand_state);
-    float sin_theta = sinf(theta);
-    vec3_mul(normal, cosf(theta), out);
-    vec3_fma(out, &look, sin_theta * sinf(phi), out);
-    vec3_fma(out, &right, sin_theta * cosf(phi), out);
     return out;
 }
 
@@ -187,7 +199,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
     SDFInstance *temp_i;
     Color3 attenuation = {1, 1, 1};
     Color3 temp_c, light_color;
-    Vector3 temp_v, position, position_last, position_pn, normal, normal_neg, origin, direction;
+    Vector3 temp_v, position, position_last, position_pn, normal, normal_micro, normal_neg, origin, direction;
     Ray cr = {vec3_cpy(r->origin, &origin), vec3_cpy(r->direction, &direction)};
     float alpha = 1;
     float rr = 1;
@@ -215,17 +227,25 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
             vec3_neg(&normal, &normal);
             col3_mul(&attenuation, col3_exp(col3_smul(col3_log(mat->color, &temp_c), vec3_mag(vec3_sub(&position, &position_last, &temp_v)), &temp_c), &temp_c), &attenuation);
         }
+        ggx_vndf(&normal, &direction, fmaxf(EPSILON, mat->roughness), rand_state, &normal_micro);
 
         float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
         float reflectance = mat->reflectance + fresnel_add;
         float transmission = (1 - reflectance) * mat->transmission;
         float diffuse = (1 - reflectance) * (1 - mat->transmission);
 
+        if (diffuse > SCENE_ALPHA_MIN) {
+            if (hit_instance->material->checker) {
+                diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+            }
+            get_light_color(self, &position, &normal, rand_state, &light_color);
+            col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
+        }
         if (diffuse < 1) {
             alpha *= 1 - diffuse;
             if (rand2(rand_state) * (reflectance + transmission) < reflectance) {
                 perturb_vector3(&position, &normal, &origin);
-                reflect_vector3(&direction, &normal, &temp_v);
+                reflect_vector3(&direction, &normal_micro, &temp_v);
                 vec3_cpy(&temp_v, &direction);
             }
             else {
@@ -235,14 +255,14 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
                 if (is_inside_instance(self, &position_pn, &temp_i)) {
                     next_ior = temp_i->material->ior;
                 }
-                if (refract_vector3(&direction, &normal, ior / next_ior, &temp_v)) {
+                if (refract_vector3(&direction, &normal_micro, ior / next_ior, &temp_v)) {
                     vec3_cpy(&position_pn, &origin);
                     vec3_cpy(&temp_v, &direction);
                     ior = next_ior;
                 }
                 else {
                     perturb_vector3(&position, &normal, &origin);
-                    reflect_vector3(&direction, &normal, &temp_v);
+                    reflect_vector3(&direction, &normal_micro, &temp_v);
                     vec3_cpy(&temp_v, &direction);
                 }
             }
@@ -250,13 +270,7 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         else {
             rr = 0;
         }
-        if (diffuse > SCENE_ALPHA_MIN) {
-            if (hit_instance->material->checker) {
-                diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
-            }
-            get_light_color(self, &position, &normal, &light_color);
-            col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
-        }
+        //fprintf(stderr, "A: %f R: %f T: %f D: %f\n", alpha, reflectance, transmission, diffuse);
     } while ((rr *= .99) > rand2(rand_state));
     return out;
 }

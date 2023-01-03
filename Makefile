@@ -61,7 +61,8 @@ clean:
 	@echo "cleaned."
 
 png:
-	@make pnmtopng
+	@make -s --no-print-directory
+	@make pnmtopng -s --no-print-directory
 	@./draw | ./pnmtopng > output.png
 
 timepng:

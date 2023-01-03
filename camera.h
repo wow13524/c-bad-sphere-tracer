@@ -9,7 +9,7 @@
 #define CAMERA_H
 
 #define DOF_DISTANCE 10
-#define DOF_RADIUS 0.25
+#define DOF_RADIUS 0.
 #define EPSILON .0001
 
 typedef struct Camera {
