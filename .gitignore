@@ -1,5 +1,7 @@
 output.png
 pnmtopng
+draw
+pnmtopng
 
 # Prerequisites
 *.d
