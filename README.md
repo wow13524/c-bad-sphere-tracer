@@ -40,4 +40,7 @@ Monte Carlo with 1024 samples-per-pixel.  Cubes in scene.  Diffuse, reflection, 
 ![Monte Carlo 1024spp, cubes, ACES tonemapping](example_outputs/output_mc_1024spp.png)
 
 Monte Carlo with 65536 samples-per-pixel.  Same as above, but with depth of field and bokeh effect.  ACES tonemapping.
-![Monte Carlo 1024spp, cubes, ACES tonemapping](example_outputs/output_mc_dof.png)
+![Monte Carlo 65536spp, cubes, ACES tonemapping](example_outputs/output_mc_dof.png)
+
+Monte Carlo with 4096 samples-per-pixel.  Testing roughness with GGX.  ACES tonemapping.
+![Monte Carlo 4096spp, GGX test, ACES tonemapping](example_outputs/output_mc_ggxtest.png)
