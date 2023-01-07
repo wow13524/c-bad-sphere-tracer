@@ -229,19 +229,32 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         }
         ggx_vndf(&normal, &direction, fmaxf(EPSILON, mat->roughness), rand_state, &normal_micro);
 
-        float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
+        /*float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
         float reflectance = mat->reflectance + fresnel_add;
         float transmission = (1 - reflectance) * mat->transmission;
-        float diffuse = (1 - reflectance) * (1 - mat->transmission);
+        float diffuse = (1 - reflectance) * (1 - mat->transmission);*/
+
+        float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
+        float reflectance = mat->reflectance + fresnel_add;
+        float transmission = mat->transmission;
+        float diffuse = 1 - reflectance;
+
+        /*
+        TODO:
+        Transmission as dominant property.  Transmission = 1: no reflection and diffuse.
+        Reflection serves as chance for bounce to be reflective vs diffuse.
+        Diffuse contribution should still be weighted by angle of incidence of outgoing ray, as well as being multiplied by the instance color.
+        Lights should still be importance sampled; still trying to figure out weight.
+        */
 
         if (diffuse > SCENE_ALPHA_MIN) {
             if (hit_instance->material->checker) {
                 diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
             }
-            get_light_color(self, &position, &normal, rand_state, &light_color);
-            col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
+            //get_light_color(self, &position, &normal, rand_state, &light_color);
+            //col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
         }
-        if (diffuse < 1) {
+        /*if (diffuse < 1) {
             alpha *= 1 - diffuse;
             if (rand2(rand_state) * (reflectance + transmission) < reflectance) {
                 perturb_vector3(&position, &normal, &origin);
@@ -266,6 +279,12 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
                     vec3_cpy(&temp_v, &direction);
                 }
             }
+        }*/
+        if (rand2(rand_state) < transmission) {
+
+        }
+        else {
+
         }
         else {
             rr = 0;
