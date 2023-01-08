@@ -229,16 +229,6 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         }
         ggx_vndf(&normal, &direction, fmaxf(EPSILON, mat->roughness), rand_state, &normal_micro);
 
-        /*float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
-        float reflectance = mat->reflectance + fresnel_add;
-        float transmission = (1 - reflectance) * mat->transmission;
-        float diffuse = (1 - reflectance) * (1 - mat->transmission);*/
-
-        float fresnel_add = fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance);
-        float reflectance = mat->reflectance + fresnel_add;
-        float transmission = mat->transmission;
-        float diffuse = 1 - reflectance;
-
         /*
         TODO:
         Transmission as dominant property.  Transmission = 1: no reflection and diffuse.
@@ -247,49 +237,39 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         Lights should still be importance sampled; still trying to figure out weight.
         */
 
-        if (diffuse > SCENE_ALPHA_MIN) {
-            if (hit_instance->material->checker) {
-                diffuse *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+        //get_light_color(self, &position, &normal, rand_state, &light_color);
+        //col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
+
+    (void) light_color;
+    int do_transmission = rand2(rand_state) < mat->transmission;
+    switch (do_transmission) {
+        case 1:
+            float next_ior = SCENE_ATMOSPHERE_IOR;
+            vec3_neg(&normal, &normal_neg);
+            perturb_vector3(&position, &normal_neg, &position_pn);
+            if (is_inside_instance(self, &position_pn, &temp_i)) {
+                next_ior = temp_i->material->ior;
             }
-            //get_light_color(self, &position, &normal, rand_state, &light_color);
-            //col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
-        }
-        /*if (diffuse < 1) {
-            alpha *= 1 - diffuse;
-            if (rand2(rand_state) * (reflectance + transmission) < reflectance) {
-                perturb_vector3(&position, &normal, &origin);
-                reflect_vector3(&direction, &normal_micro, &temp_v);
+            if (refract_vector3(&direction, &normal_micro, ior / next_ior, &temp_v)) {
+                vec3_cpy(&position_pn, &origin);
                 vec3_cpy(&temp_v, &direction);
+                ior = next_ior;
+                break;
             }
-            else {
-                float next_ior = SCENE_ATMOSPHERE_IOR;
-                vec3_neg(&normal, &normal_neg);
-                perturb_vector3(&position, &normal_neg, &position_pn);
-                if (is_inside_instance(self, &position_pn, &temp_i)) {
-                    next_ior = temp_i->material->ior;
+            /*FALL THROUGH*/
+        default:
+            if (rand2(rand_state) > mat->reflectance + fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance)) {
+                if (mat->checker) {
+                    alpha *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
                 }
-                if (refract_vector3(&direction, &normal_micro, ior / next_ior, &temp_v)) {
-                    vec3_cpy(&position_pn, &origin);
-                    vec3_cpy(&temp_v, &direction);
-                    ior = next_ior;
-                }
-                else {
-                    perturb_vector3(&position, &normal, &origin);
-                    reflect_vector3(&direction, &normal_micro, &temp_v);
-                    vec3_cpy(&temp_v, &direction);
-                }
+                ggx_vndf(&normal, &direction, 1, rand_state, &normal_micro);
+                col3_mul(&attenuation, mat->color, &attenuation);
             }
-        }*/
-        if (rand2(rand_state) < transmission) {
+            perturb_vector3(&position, &normal, &origin);
+            reflect_vector3(&direction, &normal_micro, &temp_v);
+            vec3_cpy(&temp_v, &direction);
 
-        }
-        else {
-
-        }
-        else {
-            rr = 0;
-        }
-        //fprintf(stderr, "A: %f R: %f T: %f D: %f\n", alpha, reflectance, transmission, diffuse);
+    }
     } while ((rr *= .99) > rand2(rand_state));
     return out;
 }

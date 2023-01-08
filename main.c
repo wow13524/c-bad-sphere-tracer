@@ -21,7 +21,8 @@ int main(void) {
     SDFInstance *ground_plane = sdf_instance(plane);
     ground_plane->instance->position = vector3(0, -2.501, 0);
     ground_plane->material->color = color3(1, .8, .8);
-    ground_plane->material->roughness = .025;
+    ground_plane->material->reflectance = .1;
+    ground_plane->material->roughness = .0025;
     ground_plane->material->checker = 1;
 
     SDFInstance *sphere_a = sdf_instance(sphere);
@@ -29,32 +30,36 @@ int main(void) {
     sphere_a->instance->size = vector3(5, 5, 5);
     sphere_a->material->color = color3(.8, .8, 1);
     sphere_a->material->ior = 1.125;
+    sphere_a->material->reflectance = 1;
     sphere_a->material->roughness = 0;
-    sphere_a->material->transmission = 1;
+    sphere_a->material->transmission = .9;
 
     SDFInstance *sphere_b = sdf_instance(sphere);
     sphere_b->instance->position = vector3(-3.75, 2.5, 12.5);
     sphere_b->instance->size = vector3(10, 10, 10);
     sphere_b->material->color = color3(.5, .8, .8);
     sphere_b->material->ior = 2;
+    sphere_b->material->reflectance = 1;
     sphere_b->material->roughness = .05;
-    sphere_b->material->transmission = 1;
+    sphere_b->material->transmission = .9;
 
     SDFInstance *cube_a = sdf_instance(cube);
     cube_a->instance->position = vector3(5, -.5, 8);
     cube_a->instance->size = vector3(4, 4, 4);
     cube_a->material->color = color3(.8, 1, .8);
     cube_a->material->ior = 1.25;
+    cube_a->material->reflectance = 1;
     cube_a->material->roughness = .1;
-    cube_a->material->transmission = 1;
+    cube_a->material->transmission = .9;
 
     SDFInstance *cube_b = sdf_instance(cube);
     cube_b->instance->position = vector3(-2, 1, 2.5);
     cube_b->instance->size = vector3(.75, .75, .75);
     cube_b->material->color = color3(.8, 0, .8);
     cube_b->material->ior = 1.5;
+    cube_b->material->reflectance = 1;
     cube_b->material->roughness = 0;
-    cube_b->material->transmission = 1;
+    cube_b->material->transmission = .9;
 
     SDFInstance *wall_left = sdf_instance(cube);
     wall_left->instance->position = vector3(-10, 5, 10);

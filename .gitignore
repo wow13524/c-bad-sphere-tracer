@@ -1,5 +1,5 @@
 .vscode/
-output.png
+output.*
 pnmtopng
 draw
 pnmtopng
