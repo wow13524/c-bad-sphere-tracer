@@ -97,15 +97,15 @@ int main(void) {
     s->environment = environment;
     //s->add_instance(s, test);
     s->add_instance(s, ground_plane);
-    s->add_instance(s, sphere_a);
-    s->add_instance(s, sphere_b);
-    s->add_instance(s, cube_a);
-    s->add_instance(s, cube_b);
-    s->add_instance(s, wall_left);
+    //s->add_instance(s, sphere_a);
+    //s->add_instance(s, sphere_b);
+    //s->add_instance(s, cube_a);
+    //s->add_instance(s, cube_b);
+    /*s->add_instance(s, wall_left);
     s->add_instance(s, wall_right);
     s->add_instance(s, wall_back);
     //s->add_instance(s, wall_front);
-    s->add_instance(s, wall_top);
+    s->add_instance(s, wall_top);*/
 
     render_to_ppm(s->render(s, cam));
 

@@ -229,47 +229,33 @@ Color3 *get_color_monte_carlo(Scene *self, Ray *r, void *rand_state, Color3 *out
         }
         ggx_vndf(&normal, &direction, fmaxf(EPSILON, mat->roughness), rand_state, &normal_micro);
 
-        /*
-        TODO:
-        Transmission as dominant property.  Transmission = 1: no reflection and diffuse.
-        Reflection serves as chance for bounce to be reflective vs diffuse.
-        Diffuse contribution should still be weighted by angle of incidence of outgoing ray, as well as being multiplied by the instance color.
-        Lights should still be importance sampled; still trying to figure out weight.
-        */
-
-        //get_light_color(self, &position, &normal, rand_state, &light_color);
-        //col3_sfma(out, col3_mul(&light_color, col3_mul(mat->color, &attenuation, &temp_c), &temp_c), diffuse * alpha, out);
-
-    (void) light_color;
-    int do_transmission = rand2(rand_state) < mat->transmission;
-    switch (do_transmission) {
-        case 1:
-            float next_ior = SCENE_ATMOSPHERE_IOR;
-            vec3_neg(&normal, &normal_neg);
-            perturb_vector3(&position, &normal_neg, &position_pn);
-            if (is_inside_instance(self, &position_pn, &temp_i)) {
-                next_ior = temp_i->material->ior;
-            }
-            if (refract_vector3(&direction, &normal_micro, ior / next_ior, &temp_v)) {
-                vec3_cpy(&position_pn, &origin);
-                vec3_cpy(&temp_v, &direction);
-                ior = next_ior;
-                break;
-            }
-            /*FALL THROUGH*/
-        default:
-            if (rand2(rand_state) > mat->reflectance + fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance)) {
-                if (mat->checker) {
-                    alpha *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+        (void) light_color;
+        int do_transmission = rand2(rand_state) < mat->transmission;
+        switch (do_transmission) {
+            case 1:
+                float next_ior = is_inside_instance(self, perturb_vector3(&position, vec3_neg(&normal, &normal_neg), &position_pn), &temp_i) ? temp_i->material->ior : SCENE_ATMOSPHERE_IOR;
+                if (refract_vector3(&direction, &normal_micro, ior / next_ior, &temp_v)) {
+                    vec3_cpy(&position_pn, &origin);
+                    vec3_cpy(&temp_v, &direction);
+                    ior = next_ior;
+                    break;
                 }
-                ggx_vndf(&normal, &direction, 1, rand_state, &normal_micro);
-                col3_mul(&attenuation, mat->color, &attenuation);
-            }
-            perturb_vector3(&position, &normal, &origin);
-            reflect_vector3(&direction, &normal_micro, &temp_v);
-            vec3_cpy(&temp_v, &direction);
+                //Fall through if total internal reflection
+                /*FALL THROUGH*/
+            default:
+                if (rand2(rand_state) > mat->reflectance + fresnel(&direction, &normal, ior, mat->ior) * (1 - mat->reflectance)) {
+                    if (mat->checker) {
+                        alpha *= ((int)floorf(position.x / 2) % 2 + (int)floorf(position.y / 2) % 2 + (int)floorf(position.z / 2) % 2) % 2 ? 1 : .375;
+                    }
+                    ggx_vndf(&normal, &direction, 1, rand_state, &normal_micro);
+                    col3_mul(&attenuation, mat->color, &attenuation);
+                    //TODO diffuse reflection needs masking and shadowing!!! too much light on each surface
+                }
+                perturb_vector3(&position, &normal, &origin);
+                reflect_vector3(&direction, &normal_micro, &temp_v);
+                vec3_cpy(&temp_v, &direction);
 
-    }
+        }
     } while ((rr *= .99) > rand2(rand_state));
     return out;
 }
